@@ -1,5 +1,4 @@
 import { OpenRouterModel } from '@/types/chat';
-import { getSystemPrompt, PromptType } from '@/config/prompts';
 
 const OPENROUTER_BASE = 'https://openrouter.ai/api/v1';
 
@@ -24,12 +23,9 @@ export async function streamChat(
   messages: Array<{ role: string; content: string }>,
   onChunk: (text: string) => void,
   onDone: () => void,
-  onError: (error: Error) => void,
-  promptType: PromptType = 'default'
+  onError: (error: Error) => void
 ): Promise<void> {
   try {
-    const systemPrompt = getSystemPrompt(promptType);
-    
     const response = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -40,13 +36,7 @@ export async function streamChat(
       },
       body: JSON.stringify({
         model,
-        messages: [
-          {
-            role: 'system',
-            content: systemPrompt,
-          },
-          ...messages,
-        ],
+        messages,
         stream: true,
       }),
     });
