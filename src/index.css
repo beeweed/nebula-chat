@@ -396,3 +396,216 @@
   @apply ml-4 text-foreground/80;
 }
 
+/* =============================================
+   ADVANCED MARKDOWN STYLES
+   ============================================= */
+
+/* KaTeX Math Styling */
+.markdown-content .katex-display {
+  @apply my-4 overflow-x-auto py-2;
+}
+
+.markdown-content .katex {
+  font-size: 1.1em;
+  color: hsl(var(--foreground));
+}
+
+.markdown-content .katex-display > .katex {
+  @apply text-center;
+}
+
+.markdown-content .katex-error {
+  @apply text-destructive text-sm;
+}
+
+/* Inline math */
+.markdown-content .katex:not(.katex-display .katex) {
+  @apply px-0.5;
+}
+
+/* Mermaid diagram container */
+.mermaid-container {
+  @apply flex justify-center items-center;
+}
+
+.mermaid-container svg {
+  @apply max-w-full h-auto;
+}
+
+/* Footnotes */
+.markdown-content .footnotes {
+  @apply mt-8 pt-4 border-t border-primary/20;
+}
+
+.markdown-content .footnotes h2 {
+  @apply text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3;
+}
+
+.markdown-content .footnotes ol {
+  @apply text-sm space-y-2;
+}
+
+.markdown-content .footnote-ref {
+  @apply text-xs text-primary font-medium no-underline hover:text-primary/80 align-super;
+}
+
+.markdown-content .footnote-backref {
+  @apply text-primary ml-1 no-underline hover:text-primary/80;
+}
+
+/* Anchor links */
+.markdown-content [id]:target {
+  @apply bg-primary/10 -mx-2 px-2 rounded;
+  animation: highlightFade 2s ease-out forwards;
+}
+
+@keyframes highlightFade {
+  0% { background-color: hsl(var(--primary) / 0.2); }
+  100% { background-color: transparent; }
+}
+
+/* Keyboard shortcuts */
+.markdown-content kbd {
+  @apply inline-flex items-center gap-0.5;
+  box-shadow: 
+    0 1px 0 1px hsl(var(--primary) / 0.1),
+    0 2px 0 0 hsl(0 0% 100% / 0.05) inset,
+    0 -2px 0 0 hsl(0 0% 0% / 0.2) inset;
+}
+
+/* Highlight/Mark */
+.markdown-content mark {
+  @apply rounded px-1 py-0.5;
+  background: linear-gradient(120deg, hsl(45 100% 50% / 0.3) 0%, hsl(45 100% 50% / 0.2) 100%);
+}
+
+/* Subscript and Superscript */
+.markdown-content sub,
+.markdown-content sup {
+  @apply relative;
+  font-size: 0.75em;
+  line-height: 0;
+  vertical-align: baseline;
+}
+
+.markdown-content sup {
+  top: -0.5em;
+}
+
+.markdown-content sub {
+  bottom: -0.25em;
+}
+
+/* Abbreviations */
+.markdown-content abbr[title] {
+  @apply border-b border-dotted border-primary/40 cursor-help;
+  text-decoration: none;
+}
+
+/* Image captions */
+.markdown-content figure {
+  @apply my-4;
+}
+
+.markdown-content figure img {
+  @apply mx-auto;
+}
+
+.markdown-content figcaption {
+  @apply mt-2 text-center text-sm text-muted-foreground italic;
+}
+
+/* Diff syntax in code blocks */
+.markdown-content pre .diff-add {
+  @apply bg-emerald-500/20 border-l-2 border-emerald-500;
+}
+
+.markdown-content pre .diff-remove {
+  @apply bg-red-500/20 border-l-2 border-red-500;
+}
+
+/* Line numbers for code */
+.markdown-content pre code {
+  counter-reset: line;
+}
+
+.markdown-content pre code .line::before {
+  counter-increment: line;
+  content: counter(line);
+  @apply inline-block w-8 mr-4 text-right text-muted-foreground/40 select-none;
+}
+
+/* Better table alignment */
+.markdown-content th[align="center"],
+.markdown-content td[align="center"] {
+  @apply text-center;
+}
+
+.markdown-content th[align="right"],
+.markdown-content td[align="right"] {
+  @apply text-right;
+}
+
+/* Horizontal scroll for wide content */
+.markdown-content .katex-display,
+.markdown-content [class*="overflow-x"] {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--primary) / 0.3) transparent;
+}
+
+.markdown-content .katex-display::-webkit-scrollbar,
+.markdown-content [class*="overflow-x"]::-webkit-scrollbar {
+  height: 4px;
+}
+
+.markdown-content .katex-display::-webkit-scrollbar-thumb,
+.markdown-content [class*="overflow-x"]::-webkit-scrollbar-thumb {
+  background: hsl(var(--primary) / 0.3);
+  border-radius: 2px;
+}
+
+/* Smooth animations for collapsible */
+.collapsible-enter {
+  animation: collapsibleSlideDown 0.2s ease-out;
+}
+
+@keyframes collapsibleSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* External link indicator */
+.markdown-content a[target="_blank"]::after {
+  content: none; /* Using inline SVG instead */
+}
+
+/* Better focus states for accessibility */
+.markdown-content a:focus-visible {
+  @apply outline-2 outline-offset-2 outline-accent rounded;
+}
+
+.markdown-content input[type="checkbox"]:focus-visible {
+  @apply outline-2 outline-offset-2 outline-primary;
+}
+
+/* Print styles */
+@media print {
+  .markdown-content {
+    @apply text-black;
+  }
+  
+  .markdown-content code {
+    @apply bg-gray-100 border-gray-300 text-gray-800;
+  }
+  
+  .markdown-content a {
+    @apply text-blue-600;
+  }
+}
+
