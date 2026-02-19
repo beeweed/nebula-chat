@@ -1,4 +1,4 @@
-import { Settings, Bot, Trash2, MessageSquare } from 'lucide-react';
+import { Settings, Bot, Trash2, MessageSquare, Code2 } from 'lucide-react';
 import { OpenRouterModel } from '@/types/chat';
 import { ModelSelector } from './ModelSelector';
 import { cn } from '@/lib/utils';
@@ -10,6 +10,7 @@ interface TopBarProps {
   modelsLoading: boolean;
   onSettingsOpen: () => void;
   onClearChat: () => void;
+  onCodeSandboxOpen: () => void;
   messageCount: number;
   selectedModelInfo?: OpenRouterModel;
 }
@@ -21,6 +22,7 @@ export function TopBar({
   modelsLoading,
   onSettingsOpen,
   onClearChat,
+  onCodeSandboxOpen,
   messageCount,
   selectedModelInfo,
 }: TopBarProps) {
@@ -70,6 +72,18 @@ export function TopBar({
               <Trash2 size={16} />
             </button>
           )}
+
+          <button
+            onClick={onCodeSandboxOpen}
+            title="Open Code Sandbox"
+            className={cn(
+              'w-9 h-9 rounded-xl glass-panel glow-border flex items-center justify-center',
+              'text-muted-foreground hover:text-primary transition-all duration-200'
+            )}
+            data-design-id="code-sandbox-toggle-btn"
+          >
+            <Code2 size={16} />
+          </button>
 
           <button
             onClick={onSettingsOpen}

@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Code2 } from 'lucide-react';
 import { TopBar } from '@/components/chat/TopBar';
 import { ChatMessages } from '@/components/chat/ChatMessages';
 import { ChatInput } from '@/components/chat/ChatInput';
@@ -7,7 +6,6 @@ import { SettingsModal } from '@/components/chat/SettingsModal';
 import { BottomPanel } from '@/components/filesystem/BottomPanel';
 import { useModels } from '@/hooks/useModels';
 import { useChatMessages } from '@/hooks/useChatMessages';
-import { cn } from '@/lib/utils';
 
 const STORAGE_KEY_API = 'neuralchat_apikey';
 const STORAGE_KEY_MODEL = 'neuralchat_model';
@@ -81,6 +79,7 @@ const Index = () => {
           modelsLoading={modelsLoading}
           onSettingsOpen={() => setSettingsOpen(true)}
           onClearChat={clearMessages}
+          onCodeSandboxOpen={() => setBottomPanelOpen(true)}
           messageCount={messages.length}
           selectedModelInfo={selectedModelInfo}
         />
@@ -106,24 +105,6 @@ const Index = () => {
           modelsLoading={modelsLoading}
         />
       )}
-
-      <button
-        onClick={() => setBottomPanelOpen(true)}
-        className={cn(
-          'fixed bottom-6 right-6 z-40',
-          'w-12 h-12 rounded-xl',
-          'bg-gradient-to-br from-primary/90 to-orange-600/90',
-          'flex items-center justify-center',
-          'shadow-glow-orange-sm hover:shadow-glow-orange',
-          'transition-all duration-300 hover:scale-105',
-          'border border-primary/50',
-          bottomPanelOpen && 'opacity-0 pointer-events-none'
-        )}
-        title="Open Code Sandbox"
-        data-design-id="code-sandbox-toggle-btn"
-      >
-        <Code2 size={22} className="text-white" />
-      </button>
 
       <BottomPanel
         isOpen={bottomPanelOpen}
