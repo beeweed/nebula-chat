@@ -103,11 +103,9 @@ export function BottomPanel({ isOpen, onClose }: BottomPanelProps) {
     };
   }, [isResizing, maxHeight]);
 
-  if (!isOpen) return null;
-
   return (
     <>
-      {isResizing && (
+      {isResizing && isOpen && (
         <div 
           className="fixed inset-0 z-40 cursor-row-resize" 
           style={{ touchAction: 'none' }}
@@ -119,11 +117,12 @@ export function BottomPanel({ isOpen, onClose }: BottomPanelProps) {
         className={cn(
           'fixed bottom-0 left-0 right-0 z-50 bg-[#1e1e1e] border-t border-primary/30',
           'shadow-[0_-4px_30px_rgba(0,0,0,0.5)]',
-          isAnimating && 'animate-slide-up'
+          isAnimating && 'animate-slide-up',
+          !isOpen && 'translate-y-full pointer-events-none'
         )}
         style={{ 
           height: `${height}px`,
-          transition: isResizing ? 'none' : 'height 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
+          transition: isResizing ? 'none' : 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
         }}
         data-design-id="bottom-panel"
       >
