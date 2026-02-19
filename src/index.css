@@ -334,3 +334,13 @@
 .animate-scale-in {
   animation: scaleIn 0.25s ease-out forwards;
 }
+
+.animate-streaming-cursor {
+  animation: streamCursor 0.9s step-end infinite;
+}
+
+@keyframes streamCursor {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+

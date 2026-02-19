@@ -36,7 +36,13 @@ export async function streamChat(
       },
       body: JSON.stringify({
         model,
-        messages,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a helpful, knowledgeable, and friendly AI assistant. Provide clear, accurate, and concise responses. When writing code, always use appropriate code blocks with the correct language identifier. Be direct and helpful.',
+          },
+          ...messages,
+        ],
         stream: true,
       }),
     });

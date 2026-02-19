@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import heroBg from '@/assets/hero-bg.jpg';
 import { TopBar } from '@/components/chat/TopBar';
 import { ChatMessages } from '@/components/chat/ChatMessages';
 import { ChatInput } from '@/components/chat/ChatInput';
@@ -67,21 +66,7 @@ const Index = () => {
   const canChat = !!apiKey && !!selectedModel;
 
   return (
-    <div
-      className="relative flex flex-col h-screen overflow-hidden bg-background"
-      style={{
-        backgroundImage: `url(${heroBg})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundAttachment: 'fixed',
-      }}
-    >
-      {/* Dark overlay */}
-      <div className="absolute inset-0 bg-background/92 backdrop-blur-[2px]" />
-
-      {/* Ambient glow accents */}
-      <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-accent/4 rounded-full blur-3xl pointer-events-none" />
+    <div className="relative flex flex-col h-screen overflow-hidden" style={{ background: '#000' }}>
 
       {/* App shell */}
       <div className="relative z-10 flex flex-col h-full max-w-4xl mx-auto w-full">

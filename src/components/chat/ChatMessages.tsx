@@ -1,17 +1,39 @@
 import React, { useRef, useEffect } from 'react';
 import { Bot, User, Copy, Check } from 'lucide-react';
 import { Message } from '@/types/chat';
-import { TypingIndicator } from './TypingIndicator';
 import { CodeBlock } from './CodeBlock';
 import { cn } from '@/lib/utils';
 
 interface ChatMessagesProps {
   messages: Message[];
   isStreaming: boolean;
-  streamingMessageId?: string;
 }
 
-function parseContent(content: string): React.ReactNode[] {
+// Streaming cursor component
+function StreamingCursor() {
+  return (
+    <span className="inline-flex items-center ml-0.5">
+      <span className="inline-block w-2 h-4 bg-accent animate-streaming-cursor rounded-sm" />
+    </span>
+  );
+}
+
+// Typing dots animation shown before first chunk arrives
+function TypingDots() {
+  return (
+    <div className="flex items-center gap-1.5 py-1">
+      {[0, 1, 2].map((i) => (
+        <span
+          key={i}
+          className="w-2 h-2 rounded-full bg-accent animate-typing-dot"
+          style={{ animationDelay: `${i * 0.18}s` }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function parseContent(content: string, isStreaming: boolean): React.ReactNode[] {
   const parts: React.ReactNode[] = [];
   const codeBlockRegex = /```(\w+)?\n?([\s\S]*?)```/g;
   let lastIndex = 0;
@@ -30,14 +52,18 @@ function parseContent(content: string): React.ReactNode[] {
   }
 
   if (lastIndex < content.length) {
-    parts.push(<InlineText key={key++} text={content.slice(lastIndex)} />);
+    const remaining = content.slice(lastIndex);
+    parts.push(<InlineText key={key++} text={remaining} />);
+  }
+
+  if (isStreaming) {
+    parts.push(<StreamingCursor key={key++} />);
   }
 
   return parts;
 }
 
 function InlineText({ text }: { text: string }) {
-  // Inline code
   const parts = text.split(/(`[^`]+`)/g);
   return (
     <span>
@@ -46,7 +72,7 @@ function InlineText({ text }: { text: string }) {
           return (
             <code
               key={i}
-              className="font-mono text-sm px-1.5 py-0.5 rounded bg-black/40 border border-primary/20 text-primary"
+              className="font-mono text-sm px-1.5 py-0.5 rounded bg-black/60 border border-primary/20 text-primary"
             >
               {part.slice(1, -1)}
             </code>
@@ -93,7 +119,8 @@ export function ChatMessages({ messages, isStreaming }: ChatMessagesProps) {
   }, [messages, isStreaming]);
 
   const lastMsg = messages[messages.length - 1];
-  const showTyping =
+  // Show typing dots only when streaming has started but no content yet
+  const showTypingDots =
     isStreaming && lastMsg?.role === 'assistant' && lastMsg?.content === '';
 
   return (
@@ -113,10 +140,14 @@ export function ChatMessages({ messages, isStreaming }: ChatMessagesProps) {
       )}
 
       {messages.map((msg, i) => (
-        <MessageRow key={msg.id} message={msg} isLatest={i === messages.length - 1} isStreaming={isStreaming} />
+        <MessageRow
+          key={msg.id}
+          message={msg}
+          isLatest={i === messages.length - 1}
+          isStreaming={isStreaming}
+          showTypingDots={showTypingDots && i === messages.length - 1}
+        />
       ))}
-
-      {showTyping && <TypingIndicator />}
 
       <div ref={bottomRef} />
     </div>
@@ -127,10 +158,12 @@ function MessageRow({
   message,
   isLatest,
   isStreaming,
+  showTypingDots,
 }: {
   message: Message;
   isLatest: boolean;
   isStreaming: boolean;
+  showTypingDots: boolean;
 }) {
   const isUser = message.role === 'user';
   const isStreamingThis = isLatest && isStreaming && !isUser;
@@ -158,33 +191,31 @@ function MessageRow({
         )}
       </div>
 
-      {/* Bubble */}
-      <div
-        className={cn(
-          'relative max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed',
-          isUser
-            ? 'chat-bubble-user rounded-tr-sm'
-            : 'chat-bubble-assistant rounded-tl-sm'
-        )}
-      >
-        {/* Copy button */}
-        {!isUser && message.content && (
-          <div className="absolute top-2 right-2">
-            <CopyButton text={message.content} />
-          </div>
-        )}
-
-        {isUser ? (
+      {/* Content */}
+      {isUser ? (
+        /* User: chat bubble */
+        <div className="relative max-w-[75%] rounded-2xl rounded-tr-sm px-4 py-3 text-sm leading-relaxed chat-bubble-user">
           <span className="whitespace-pre-wrap break-words">{message.content}</span>
-        ) : (
-          <div className="prose prose-invert prose-sm max-w-none">
-            {parseContent(message.content)}
-            {isStreamingThis && (
-              <span className="inline-block w-0.5 h-4 bg-accent ml-0.5 animate-pulse" />
-            )}
-          </div>
-        )}
-      </div>
+        </div>
+      ) : (
+        /* Assistant: NO bubble — plain text on dark background */
+        <div className="relative flex-1 min-w-0 text-sm leading-relaxed text-foreground/90 pt-1">
+          {/* Copy button */}
+          {message.content && (
+            <div className="absolute top-0 right-0">
+              <CopyButton text={message.content} />
+            </div>
+          )}
+
+          {showTypingDots ? (
+            <TypingDots />
+          ) : (
+            <div className="prose-content pr-8">
+              {parseContent(message.content, isStreamingThis)}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
