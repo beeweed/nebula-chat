@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { X, GripHorizontal, Code2 } from 'lucide-react';
+import { X, GripHorizontal, Code2, Maximize2, Minimize2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import FileSystemPanel from './FileSystemPanel';
 
@@ -9,16 +9,28 @@ interface BottomPanelProps {
 }
 
 const MIN_HEIGHT = 200;
-const MAX_HEIGHT = 800;
+const HEADER_OFFSET = 60; // Space for the app header
 const DEFAULT_HEIGHT = 400;
 
 export function BottomPanel({ isOpen, onClose }: BottomPanelProps) {
   const [height, setHeight] = useState(DEFAULT_HEIGHT);
   const [isResizing, setIsResizing] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [isMaximized, setIsMaximized] = useState(false);
+  const [maxHeight, setMaxHeight] = useState(window.innerHeight - HEADER_OFFSET);
   const panelRef = useRef<HTMLDivElement>(null);
   const startYRef = useRef(0);
   const startHeightRef = useRef(0);
+  const prevHeightRef = useRef(DEFAULT_HEIGHT);
+
+  // Update max height on window resize
+  useEffect(() => {
+    const updateMaxHeight = () => {
+      setMaxHeight(window.innerHeight - HEADER_OFFSET);
+    };
+    window.addEventListener('resize', updateMaxHeight);
+    return () => window.removeEventListener('resize', updateMaxHeight);
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -42,20 +54,34 @@ export function BottomPanel({ isOpen, onClose }: BottomPanelProps) {
     startHeightRef.current = height;
   }, [height]);
 
+  // Toggle maximize
+  const toggleMaximize = useCallback(() => {
+    if (isMaximized) {
+      setHeight(prevHeightRef.current);
+      setIsMaximized(false);
+    } else {
+      prevHeightRef.current = height;
+      setHeight(maxHeight);
+      setIsMaximized(true);
+    }
+  }, [isMaximized, height, maxHeight]);
+
   useEffect(() => {
     if (!isResizing) return;
 
     const handleMouseMove = (e: MouseEvent) => {
       const deltaY = startYRef.current - e.clientY;
-      const newHeight = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, startHeightRef.current + deltaY));
+      const newHeight = Math.max(MIN_HEIGHT, Math.min(maxHeight, startHeightRef.current + deltaY));
       setHeight(newHeight);
+      setIsMaximized(newHeight >= maxHeight - 10);
     };
 
     const handleTouchMove = (e: TouchEvent) => {
       e.preventDefault();
       const deltaY = startYRef.current - e.touches[0].clientY;
-      const newHeight = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, startHeightRef.current + deltaY));
+      const newHeight = Math.max(MIN_HEIGHT, Math.min(maxHeight, startHeightRef.current + deltaY));
       setHeight(newHeight);
+      setIsMaximized(newHeight >= maxHeight - 10);
     };
 
     const handleEnd = () => {
@@ -75,7 +101,7 @@ export function BottomPanel({ isOpen, onClose }: BottomPanelProps) {
       document.removeEventListener('touchend', handleEnd);
       document.removeEventListener('touchcancel', handleEnd);
     };
-  }, [isResizing]);
+  }, [isResizing, maxHeight]);
 
   if (!isOpen) return null;
 
@@ -97,15 +123,16 @@ export function BottomPanel({ isOpen, onClose }: BottomPanelProps) {
         )}
         style={{ 
           height: `${height}px`,
-          transition: isResizing ? 'none' : 'height 0.1s ease-out'
+          transition: isResizing ? 'none' : 'height 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
         }}
         data-design-id="bottom-panel"
       >
         <div
           onMouseDown={handleMouseDown}
           onTouchStart={handleTouchStart}
+          onDoubleClick={toggleMaximize}
           className={cn(
-            'absolute top-0 left-0 right-0 h-3 cursor-row-resize',
+            'absolute top-0 left-0 right-0 h-4 cursor-row-resize',
             'flex items-center justify-center group',
             'bg-gradient-to-b from-[#333] to-transparent',
             'hover:from-primary/30 transition-colors',
@@ -127,26 +154,36 @@ export function BottomPanel({ isOpen, onClose }: BottomPanelProps) {
           </div>
         </div>
 
-        <div className="h-10 bg-[#252526] border-b border-[#333] flex items-center justify-between px-4 mt-3" data-design-id="bottom-panel-header">
+        <div className="h-10 bg-[#252526] border-b border-[#333] flex items-center justify-between px-4 mt-4" data-design-id="bottom-panel-header">
           <div className="flex items-center gap-2">
             <Code2 size={16} className="text-primary" />
             <span className="text-sm font-medium text-gray-300" data-design-id="bottom-panel-title">Code Sandbox</span>
             <span className="text-xs text-gray-500 px-2 py-0.5 bg-[#333] rounded" data-design-id="bottom-panel-badge">E2B</span>
           </div>
           
-          <button
-            onClick={onClose}
-            className="p-1.5 text-gray-400 hover:text-white hover:bg-[#444] rounded transition-colors"
-            title="Close panel"
-            data-design-id="bottom-panel-close-btn"
-          >
-            <X size={16} />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={toggleMaximize}
+              className="p-1.5 text-gray-400 hover:text-primary hover:bg-[#444] rounded transition-colors"
+              title={isMaximized ? "Restore panel" : "Maximize panel"}
+              data-design-id="bottom-panel-maximize-btn"
+            >
+              {isMaximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+            </button>
+            <button
+              onClick={onClose}
+              className="p-1.5 text-gray-400 hover:text-white hover:bg-[#444] rounded transition-colors"
+              title="Close panel"
+              data-design-id="bottom-panel-close-btn"
+            >
+              <X size={16} />
+            </button>
+          </div>
         </div>
 
         <div 
           className="overflow-hidden" 
-          style={{ height: `calc(100% - 52px)` }}
+          style={{ height: `calc(100% - 56px)` }}
           data-design-id="bottom-panel-content"
         >
           <FileSystemPanel />
