@@ -1,4 +1,5 @@
 import { OpenRouterModel } from '@/types/chat';
+import { SYSTEM_PROMPT } from '@/config/prompts';
 
 const OPENROUTER_BASE = 'https://openrouter.ai/api/v1';
 
@@ -36,7 +37,10 @@ export async function streamChat(
       },
       body: JSON.stringify({
         model,
-        messages,
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          ...messages,
+        ],
         stream: true,
       }),
     });
