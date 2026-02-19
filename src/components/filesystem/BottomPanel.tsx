@@ -10,10 +10,10 @@ interface BottomPanelProps {
 
 const MIN_HEIGHT = 200;
 const HEADER_OFFSET = 60; // Space for the app header
-const DEFAULT_HEIGHT = 400;
+const getDefaultHeight = () => Math.round(window.innerHeight * 0.75);
 
 export function BottomPanel({ isOpen, onClose }: BottomPanelProps) {
-  const [height, setHeight] = useState(DEFAULT_HEIGHT);
+  const [height, setHeight] = useState(getDefaultHeight);
   const [isResizing, setIsResizing] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
@@ -21,7 +21,7 @@ export function BottomPanel({ isOpen, onClose }: BottomPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const startYRef = useRef(0);
   const startHeightRef = useRef(0);
-  const prevHeightRef = useRef(DEFAULT_HEIGHT);
+  const prevHeightRef = useRef(getDefaultHeight());
 
   // Update max height on window resize
   useEffect(() => {
