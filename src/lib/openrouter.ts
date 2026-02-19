@@ -1,4 +1,5 @@
 import { OpenRouterModel } from '@/types/chat';
+import { getSystemPrompt, PromptType } from '@/config/prompts';
 
 const OPENROUTER_BASE = 'https://openrouter.ai/api/v1';
 
@@ -23,23 +24,26 @@ export async function streamChat(
   messages: Array<{ role: string; content: string }>,
   onChunk: (text: string) => void,
   onDone: () => void,
-  onError: (error: Error) => void
+  onError: (error: Error) => void,
+  promptType: PromptType = 'default'
 ): Promise<void> {
   try {
+    const systemPrompt = getSystemPrompt(promptType);
+    
     const response = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
         'HTTP-Referer': window.location.origin,
-        'X-Title': 'AI Chatbot',
+        'X-Title': 'Nebula Chat',
       },
       body: JSON.stringify({
         model,
         messages: [
           {
             role: 'system',
-            content: 'You are a helpful, knowledgeable, and friendly AI assistant. Provide clear, accurate, and concise responses. When writing code, always use appropriate code blocks with the correct language identifier. Be direct and helpful.',
+            content: systemPrompt,
           },
           ...messages,
         ],

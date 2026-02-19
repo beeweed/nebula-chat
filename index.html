@@ -3,20 +3,32 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- TODO: Set the document title to the name of your application -->
-    <title>Lovable App</title>
-    <meta name="description" content="Lovable Generated Project" />
-    <meta name="author" content="Lovable" />
+    <title>Nebula Chat</title>
+    <meta name="description" content="AI Chat Application powered by OpenRouter" />
+    <meta name="author" content="Nebula Chat" />
 
-    <!-- TODO: Update og:title to match your application name -->
-    <meta property="og:title" content="Lovable App" />
-    <meta property="og:description" content="Lovable Generated Project" />
+    <meta property="og:title" content="Nebula Chat" />
+    <meta property="og:description" content="AI Chat Application powered by OpenRouter" />
     <meta property="og:type" content="website" />
-    <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
 
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:site" content="@Lovable" />
-    <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+    
+    <script data-design-ignore="true">
+    (function() {
+      if (window === window.parent || window.__DESIGN_NAV_REPORTER__) return;
+      window.__DESIGN_NAV_REPORTER__ = true;
+      function report() {
+        try { window.parent.postMessage({ type: 'IFRAME_URL_CHANGE', payload: { url: location.origin + location.pathname + location.hash } }, '*'); } catch(e) {}
+      }
+      report();
+      var ps = history.pushState, rs = history.replaceState;
+      history.pushState = function() { ps.apply(this, arguments); report(); };
+      history.replaceState = function() { rs.apply(this, arguments); report(); };
+      window.addEventListener('popstate', report);
+      window.addEventListener('hashchange', report);
+      window.addEventListener('load', report);
+    })();
+    </script>
   </head>
 
   <body>

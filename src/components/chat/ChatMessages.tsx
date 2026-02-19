@@ -1,21 +1,12 @@
 import React, { useRef, useEffect } from 'react';
 import { Bot, User, Copy, Check } from 'lucide-react';
 import { Message } from '@/types/chat';
-import { CodeBlock } from './CodeBlock';
+import { MarkdownRenderer } from './MarkdownRenderer';
 import { cn } from '@/lib/utils';
 
 interface ChatMessagesProps {
   messages: Message[];
   isStreaming: boolean;
-}
-
-// Streaming cursor component
-function StreamingCursor() {
-  return (
-    <span className="inline-flex items-center ml-0.5">
-      <span className="inline-block w-2 h-4 bg-accent animate-streaming-cursor rounded-sm" />
-    </span>
-  );
 }
 
 // Typing dots animation shown before first chunk arrives
@@ -30,61 +21,6 @@ function TypingDots() {
         />
       ))}
     </div>
-  );
-}
-
-function parseContent(content: string, isStreaming: boolean): React.ReactNode[] {
-  const parts: React.ReactNode[] = [];
-  const codeBlockRegex = /```(\w+)?\n?([\s\S]*?)```/g;
-  let lastIndex = 0;
-  let match;
-  let key = 0;
-
-  while ((match = codeBlockRegex.exec(content)) !== null) {
-    if (match.index > lastIndex) {
-      const text = content.slice(lastIndex, match.index);
-      parts.push(<InlineText key={key++} text={text} />);
-    }
-    parts.push(
-      <CodeBlock key={key++} language={match[1] || 'text'} code={match[2].trim()} />
-    );
-    lastIndex = match.index + match[0].length;
-  }
-
-  if (lastIndex < content.length) {
-    const remaining = content.slice(lastIndex);
-    parts.push(<InlineText key={key++} text={remaining} />);
-  }
-
-  if (isStreaming) {
-    parts.push(<StreamingCursor key={key++} />);
-  }
-
-  return parts;
-}
-
-function InlineText({ text }: { text: string }) {
-  const parts = text.split(/(`[^`]+`)/g);
-  return (
-    <span>
-      {parts.map((part, i) => {
-        if (part.startsWith('`') && part.endsWith('`')) {
-          return (
-            <code
-              key={i}
-              className="font-mono text-sm px-1.5 py-0.5 rounded bg-black/60 border border-primary/20 text-primary"
-            >
-              {part.slice(1, -1)}
-            </code>
-          );
-        }
-        return (
-          <span key={i} className="whitespace-pre-wrap break-words">
-            {part}
-          </span>
-        );
-      })}
-    </span>
   );
 }
 
@@ -211,7 +147,7 @@ function MessageRow({
             <TypingDots />
           ) : (
             <div className="prose-content pr-8">
-              {parseContent(message.content, isStreamingThis)}
+              <MarkdownRenderer content={message.content} isStreaming={isStreamingThis} />
             </div>
           )}
         </div>

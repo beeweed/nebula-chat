@@ -1,8 +1,8 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 /* =============================================
    FUTURISTIC AI CHATBOT DESIGN SYSTEM
@@ -342,5 +342,57 @@
 @keyframes streamCursor {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
+}
+
+/* =============================================
+   MARKDOWN CONTENT STYLES
+   ============================================= */
+
+.markdown-content {
+  @apply text-foreground/90 leading-relaxed;
+}
+
+.markdown-content > *:first-child {
+  margin-top: 0 !important;
+}
+
+.markdown-content > *:last-child {
+  margin-bottom: 0 !important;
+}
+
+/* Better list rendering */
+.markdown-content ul ul,
+.markdown-content ol ol,
+.markdown-content ul ol,
+.markdown-content ol ul {
+  @apply ml-4 mt-1;
+}
+
+/* Task lists (GFM) */
+.markdown-content input[type="checkbox"] {
+  @apply mr-2 accent-primary;
+}
+
+/* Strikethrough */
+.markdown-content del {
+  @apply text-muted-foreground line-through;
+}
+
+/* Images in markdown */
+.markdown-content img {
+  @apply rounded-lg max-w-full h-auto my-4 border border-primary/20;
+}
+
+/* Definition lists */
+.markdown-content dl {
+  @apply my-4;
+}
+
+.markdown-content dt {
+  @apply font-semibold text-foreground;
+}
+
+.markdown-content dd {
+  @apply ml-4 text-foreground/80;
 }
 
