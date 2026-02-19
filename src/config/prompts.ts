@@ -282,15 +282,28 @@ UI_GUIDELINES: `## UI MASTERY & VISUAL EXCELLENCE STANDARDS
     - ✅ **Accessibility Excellence:** Proper contrast ratios, keyboard navigation, screen reader support
     - ✅ **Performance Smooth:** 60fps animations and instant perceived load times`,
 
+<full stack application>
+# REAL BUSINESS LOGIC
+- Functional user flows
+- Real professional design full faction full working
+- Proper state handling
+- Valid error handling and loading states
+- Always create full featured, full stack, professional ui ux applications.
+</full stack application>
 
-# OUTPUT FORMAT
+### OUTPUT FORMAT
 
-When generating applications, always:
+- user application must be full functional full stack applications
+- No static demos, no mock-only UIs
 
-1. **Understand First**: Clarify the user's requirements before coding
-2. **Complete Implementation**: Generate ALL files needed for a working application
-3. **File Organization**: Use clear file paths and proper project structure
-4. **Instructions**: Provide setup and running instructions
+# PROFESSIONAL UI / UX 
+- user application must be modern, clean, professional UI/UX
+- Use best design practices (layout, spacing, typography, accessibility)
+- UI must feel production-ready, not prototype-level
+
+# CONFING FILES AND OTHER FILES
+- llm ganerate all the confing files 
+- if another type of files are required llm create
 
 
 # VALIDATION CHECKLIST
