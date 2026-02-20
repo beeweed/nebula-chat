@@ -6,9 +6,10 @@ interface ChatInputProps {
   onSend: (message: string) => void;
   isStreaming: boolean;
   disabled: boolean;
+  placeholder?: string;
 }
 
-export function ChatInput({ onSend, isStreaming, disabled }: ChatInputProps) {
+export function ChatInput({ onSend, isStreaming, disabled, placeholder }: ChatInputProps) {
   const [value, setValue] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -57,9 +58,9 @@ export function ChatInput({ onSend, isStreaming, disabled }: ChatInputProps) {
           onKeyDown={handleKeyDown}
           onInput={handleInput}
           placeholder={
-            disabled
-              ? 'Add API key in Settings...'
-              : 'Send a message...'
+            placeholder || (disabled
+              ? 'Add API keys in Settings...'
+              : 'Send a message...')
           }
           disabled={disabled || isStreaming}
           rows={1}

@@ -1,34 +1,45 @@
 import { useState } from 'react';
-import { Settings, X, Key, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
+import { Settings, X, Key, RefreshCw, CheckCircle, AlertCircle, Box } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface SettingsModalProps {
   apiKey: string;
-  onSave: (key: string) => void;
+  e2bApiKey: string;
+  onSave: (openRouterKey: string, e2bKey: string) => void;
   onClose: () => void;
   modelCount: number;
   modelsLoading: boolean;
+  e2bConnected?: boolean;
+  e2bConnecting?: boolean;
 }
 
 export function SettingsModal({
   apiKey,
+  e2bApiKey,
   onSave,
   onClose,
   modelCount,
   modelsLoading,
+  e2bConnected = false,
+  e2bConnecting = false,
 }: SettingsModalProps) {
-  const [inputValue, setInputValue] = useState(apiKey);
+  const [openRouterValue, setOpenRouterValue] = useState(apiKey);
+  const [e2bValue, setE2bValue] = useState(e2bApiKey);
   const [saved, setSaved] = useState(false);
 
   const handleSave = () => {
-    const trimmed = inputValue.trim();
-    onSave(trimmed);
+    const trimmedOpenRouter = openRouterValue.trim();
+    const trimmedE2b = e2bValue.trim();
+    onSave(trimmedOpenRouter, trimmedE2b);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
 
-  const isValid = inputValue.trim().startsWith('sk-');
-  const hasKey = apiKey.length > 0;
+  const isOpenRouterValid = openRouterValue.trim().startsWith('sk-');
+  const isE2bValid = e2bValue.trim().startsWith('e2b_');
+  const hasOpenRouterKey = apiKey.length > 0;
+  const hasE2bKey = e2bApiKey.length > 0;
+  const canSave = openRouterValue.trim() && e2bValue.trim();
 
   return (
     <div
@@ -49,7 +60,7 @@ export function SettingsModal({
               </div>
               <div>
                 <h2 className="text-sm sm:text-base font-semibold text-foreground">Settings</h2>
-                <p className="text-xs text-muted-foreground">Configure your AI connection</p>
+                <p className="text-xs text-muted-foreground">Configure your AI & Sandbox</p>
               </div>
             </div>
             <button
@@ -62,7 +73,7 @@ export function SettingsModal({
 
           {/* Body */}
           <div className="p-4 sm:p-6 space-y-4 sm:space-y-5 pb-safe">
-            {/* API Key */}
+            {/* OpenRouter API Key */}
             <div className="space-y-2">
               <label className="flex items-center gap-2 text-sm font-medium text-foreground">
                 <Key size={14} className="text-primary" />
@@ -71,8 +82,8 @@ export function SettingsModal({
               <div className="relative">
                 <input
                   type="password"
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
+                  value={openRouterValue}
+                  onChange={(e) => setOpenRouterValue(e.target.value)}
                   placeholder="sk-or-v1-..."
                   className={cn(
                     'w-full input-neon rounded-lg sm:rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 text-sm font-mono',
@@ -80,9 +91,9 @@ export function SettingsModal({
                     'pr-10'
                   )}
                 />
-                {inputValue && (
+                {openRouterValue && (
                   <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                    {isValid ? (
+                    {isOpenRouterValid ? (
                       <CheckCircle size={16} className="text-green-400" />
                     ) : (
                       <AlertCircle size={16} className="text-destructive/70" />
@@ -100,12 +111,11 @@ export function SettingsModal({
                 >
                   openrouter.ai/keys
                 </a>
-                . Keys are stored locally.
               </p>
             </div>
 
-            {/* Status */}
-            {hasKey && (
+            {/* OpenRouter Status */}
+            {hasOpenRouterKey && (
               <div className={cn(
                 'flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg sm:rounded-xl border',
                 modelsLoading
@@ -141,20 +151,107 @@ export function SettingsModal({
               </div>
             )}
 
+            {/* Divider */}
+            <div className="border-t border-border" />
+
+            {/* E2B API Key */}
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+                <Box size={14} className="text-blue-400" />
+                E2B Sandbox API Key
+                <span className="text-xs text-destructive">*required</span>
+              </label>
+              <div className="relative">
+                <input
+                  type="password"
+                  value={e2bValue}
+                  onChange={(e) => setE2bValue(e.target.value)}
+                  placeholder="e2b_..."
+                  className={cn(
+                    'w-full input-neon rounded-lg sm:rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 text-sm font-mono',
+                    'text-foreground placeholder:text-muted-foreground/40',
+                    'pr-10'
+                  )}
+                />
+                {e2bValue && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    {isE2bValid ? (
+                      <CheckCircle size={16} className="text-green-400" />
+                    ) : (
+                      <AlertCircle size={16} className="text-destructive/70" />
+                    )}
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Get your API key from{' '}
+                <a
+                  href="https://e2b.dev/dashboard"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-400 hover:underline"
+                >
+                  e2b.dev/dashboard
+                </a>
+                . Required for code sandbox.
+              </p>
+            </div>
+
+            {/* E2B Status */}
+            {hasE2bKey && (
+              <div className={cn(
+                'flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg sm:rounded-xl border',
+                e2bConnecting
+                  ? 'bg-muted/30 border-border'
+                  : e2bConnected
+                  ? 'bg-green-500/10 border-green-500/20'
+                  : 'bg-blue-500/10 border-blue-500/20'
+              )}>
+                {e2bConnecting ? (
+                  <RefreshCw size={14} className="text-muted-foreground animate-spin" />
+                ) : e2bConnected ? (
+                  <CheckCircle size={14} className="text-green-400" />
+                ) : (
+                  <Box size={14} className="text-blue-400" />
+                )}
+                <span className={cn(
+                  'text-xs sm:text-sm',
+                  e2bConnecting
+                    ? 'text-muted-foreground'
+                    : e2bConnected
+                    ? 'text-green-400'
+                    : 'text-blue-400'
+                )}>
+                  {e2bConnecting
+                    ? 'Creating sandbox...'
+                    : e2bConnected
+                    ? 'Sandbox connected'
+                    : 'Sandbox will start on first message'}
+                </span>
+              </div>
+            )}
+
+            {/* Info Box */}
+            <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg sm:rounded-xl px-3 sm:px-4 py-2.5 sm:py-3">
+              <p className="text-xs text-blue-300">
+                <strong>Note:</strong> Both API keys are required. The E2B sandbox will automatically start when you send your first message.
+              </p>
+            </div>
+
             {/* Save button */}
             <button
               onClick={handleSave}
-              disabled={!inputValue.trim()}
+              disabled={!canSave}
               className={cn(
                 'w-full py-2.5 sm:py-3 rounded-lg sm:rounded-xl font-medium text-sm transition-all duration-300 active:scale-[0.98]',
-                inputValue.trim()
+                canSave
                   ? saved
                     ? 'bg-green-500/20 border border-green-500/30 text-green-400'
                     : 'btn-neon'
                   : 'bg-muted text-muted-foreground cursor-not-allowed opacity-50'
               )}
             >
-              {saved ? '✓ Saved & Reloading...' : 'Save & Fetch Models'}
+              {saved ? '✓ Saved!' : 'Save Settings'}
             </button>
           </div>
         </div>

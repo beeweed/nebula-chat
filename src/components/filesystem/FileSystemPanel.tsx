@@ -3,7 +3,7 @@ import Editor, { Monaco } from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';
 import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
-import { Sandbox } from 'e2b';
+import { useE2BSandbox } from '@/contexts/E2BSandboxContext';
 import { 
   Menu, 
   X, 
@@ -23,13 +23,10 @@ import {
   File, 
   ChevronRight, 
   ChevronDown,
-  Key, 
   Play, 
   Square, 
   CheckCircle, 
   AlertCircle,
-  Eye,
-  EyeOff,
   Cloud,
   CloudOff,
   ExternalLink,
@@ -412,494 +409,6 @@ const useFileSystem = () => {
     mergeWithSandboxFiles,
     getAllFiles,
     setFiles,
-  };
-};
-
-// useE2BSandbox Hook
-const useE2BSandbox = () => {
-  const [state, setState] = useState<E2BSandboxState>({
-    isConnected: false,
-    isConnecting: false,
-    sandboxId: null,
-    error: null,
-    apiKey: '',
-    isSyncing: false,
-  });
-
-  const sandboxRef = useRef<Sandbox | null>(null);
-  const terminalsRef = useRef<Map<string, { pid: number; dataCallback: (data: Uint8Array) => void }>>(new Map());
-  const fileChangeListenersRef = useRef<((event: FileChangeEvent) => void)[]>([]);
-  const watcherIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const lastFilesHashRef = useRef<Map<string, number>>(new Map());
-
-  const setApiKey = useCallback((key: string) => {
-    setState(prev => ({ ...prev, apiKey: key, error: null }));
-  }, []);
-
-  const onFileChange = useCallback((callback: (event: FileChangeEvent) => void) => {
-    fileChangeListenersRef.current.push(callback);
-    return () => {
-      fileChangeListenersRef.current = fileChangeListenersRef.current.filter(cb => cb !== callback);
-    };
-  }, []);
-
-  const notifyFileChange = useCallback((event: FileChangeEvent) => {
-    fileChangeListenersRef.current.forEach(cb => cb(event));
-  }, []);
-
-  const listAllFiles = useCallback(async (
-    path: string,
-    result: { path: string; isDir: boolean; content?: string }[] = []
-  ): Promise<{ path: string; isDir: boolean; content?: string }[]> => {
-    if (!sandboxRef.current) return result;
-
-    try {
-      const files = await sandboxRef.current.files.list(path);
-      
-      for (const file of files) {
-        const fullPath = path === '/' ? `/${file.name}` : `${path}/${file.name}`;
-        const isDirectory = file.type === 'dir';
-        
-        if (isDirectory) {
-          result.push({ path: fullPath, isDir: true });
-          await listAllFiles(fullPath, result);
-        } else {
-          try {
-            const content = await sandboxRef.current.files.read(fullPath);
-            result.push({ path: fullPath, isDir: false, content });
-          } catch (e) {
-            result.push({ path: fullPath, isDir: false });
-          }
-        }
-      }
-    } catch (error) {
-      console.error(`Failed to list files at ${path}:`, error);
-    }
-
-    return result;
-  }, []);
-
-  const syncLocalToSandbox = useCallback(async (files: FileSystemItem[], basePath = '/home/user') => {
-    if (!sandboxRef.current) {
-      console.error('No sandbox connected');
-      return false;
-    }
-
-    setState(prev => ({ ...prev, isSyncing: true }));
-
-    try {
-      const buildPath = (file: FileSystemItem, allFiles: FileSystemItem[]): string => {
-        const parts: string[] = [file.name];
-        let current = file;
-        
-        while (current.parentId && current.parentId !== 'root') {
-          const parent = allFiles.find(f => f.id === current.parentId);
-          if (parent) {
-            parts.unshift(parent.name);
-            current = parent;
-          } else {
-            break;
-          }
-        }
-        
-        return `${basePath}/${parts.join('/')}`;
-      };
-
-      const sortedFiles = [...files]
-        .filter(f => f.id !== 'root')
-        .sort((a, b) => {
-          if (a.type === 'folder' && b.type !== 'folder') return -1;
-          if (a.type !== 'folder' && b.type === 'folder') return 1;
-          return 0;
-        });
-
-      for (const file of sortedFiles) {
-        const fullPath = buildPath(file, files);
-        
-        if (file.type === 'folder') {
-          try {
-            await sandboxRef.current.files.makeDir(fullPath);
-          } catch (e) {
-            // Folder might already exist
-          }
-        } else if (file.content !== undefined) {
-          await sandboxRef.current.files.write(fullPath, file.content);
-        }
-      }
-
-      setState(prev => ({ ...prev, isSyncing: false }));
-      return true;
-    } catch (error: any) {
-      console.error('Failed to sync local to sandbox:', error);
-      setState(prev => ({ ...prev, isSyncing: false, error: error.message }));
-      return false;
-    }
-  }, []);
-
-  const syncSandboxToLocal = useCallback(async (
-    basePath = '/home/user'
-  ): Promise<FileSystemItem[]> => {
-    if (!sandboxRef.current) {
-      console.error('No sandbox connected');
-      return [];
-    }
-
-    setState(prev => ({ ...prev, isSyncing: true }));
-
-    try {
-      const allFiles = await listAllFiles(basePath);
-      const newFiles: FileSystemItem[] = [];
-      const pathToIdMap = new Map<string, string>();
-      
-      pathToIdMap.set(basePath, 'root');
-
-      for (const file of allFiles) {
-        const relativePath = file.path.replace(basePath + '/', '');
-        const parts = relativePath.split('/');
-        const fileName = parts[parts.length - 1];
-        
-        const parentPath = parts.length > 1 
-          ? basePath + '/' + parts.slice(0, -1).join('/')
-          : basePath;
-        const parentId = pathToIdMap.get(parentPath) || 'root';
-        
-        const id = `e2b-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        pathToIdMap.set(file.path, id);
-
-        const newFile: FileSystemItem = {
-          id,
-          parentId,
-          name: fileName,
-          type: file.isDir ? 'folder' : 'file',
-          content: file.isDir ? undefined : (file.content || ''),
-          isOpen: file.isDir ? true : undefined,
-        };
-
-        newFiles.push(newFile);
-      }
-
-      setState(prev => ({ ...prev, isSyncing: false }));
-      return newFiles;
-    } catch (error: any) {
-      console.error('Failed to sync sandbox to local:', error);
-      setState(prev => ({ ...prev, isSyncing: false, error: error.message }));
-      return [];
-    }
-  }, [listAllFiles]);
-
-  const startFileWatcher = useCallback((basePath = '/home/user') => {
-    if (watcherIntervalRef.current) {
-      clearInterval(watcherIntervalRef.current);
-    }
-
-    const checkForChanges = async () => {
-      if (!sandboxRef.current) return;
-
-      try {
-        const files = await listAllFiles(basePath);
-        const currentHash = new Map<string, number>();
-
-        for (const file of files) {
-          const hash = file.content ? file.content.length : (file.isDir ? 0 : -1);
-          currentHash.set(file.path, hash);
-
-          const lastHash = lastFilesHashRef.current.get(file.path);
-          if (lastHash === undefined) {
-            notifyFileChange({
-              type: 'created',
-              path: file.path,
-              isDirectory: file.isDir,
-            });
-          } else if (lastHash !== hash) {
-            notifyFileChange({
-              type: 'modified',
-              path: file.path,
-              isDirectory: file.isDir,
-            });
-          }
-        }
-
-        for (const [path] of lastFilesHashRef.current) {
-          if (!currentHash.has(path)) {
-            notifyFileChange({
-              type: 'deleted',
-              path,
-              isDirectory: false,
-            });
-          }
-        }
-
-        lastFilesHashRef.current = currentHash;
-      } catch (error) {
-        console.error('Error checking for file changes:', error);
-      }
-    };
-
-    watcherIntervalRef.current = setInterval(checkForChanges, 2000);
-    checkForChanges();
-  }, [listAllFiles, notifyFileChange]);
-
-  const stopFileWatcher = useCallback(() => {
-    if (watcherIntervalRef.current) {
-      clearInterval(watcherIntervalRef.current);
-      watcherIntervalRef.current = null;
-    }
-    lastFilesHashRef.current.clear();
-  }, []);
-
-  const createSandbox = useCallback(async () => {
-    if (!state.apiKey) {
-      setState(prev => ({ ...prev, error: 'Please enter your E2B API key' }));
-      return null;
-    }
-
-    setState(prev => ({ ...prev, isConnecting: true, error: null }));
-
-    try {
-      const sandbox = await Sandbox.create({
-        apiKey: state.apiKey,
-        timeoutMs: 60 * 60 * 1000,
-      });
-
-      sandboxRef.current = sandbox;
-
-      setState(prev => ({
-        ...prev,
-        isConnected: true,
-        isConnecting: false,
-        sandboxId: sandbox.sandboxId,
-        error: null,
-      }));
-
-      startFileWatcher('/home/user');
-
-      return sandbox;
-    } catch (error: any) {
-      console.error('Failed to create sandbox:', error);
-      setState(prev => ({
-        ...prev,
-        isConnecting: false,
-        error: error.message || 'Failed to create sandbox',
-      }));
-      return null;
-    }
-  }, [state.apiKey, startFileWatcher]);
-
-  const createTerminal = useCallback(async (
-    terminalId: string,
-    cols: number,
-    rows: number,
-    onData: (data: Uint8Array) => void
-  ) => {
-    if (!sandboxRef.current) {
-      console.error('No sandbox connected');
-      return null;
-    }
-
-    try {
-      const terminal = await sandboxRef.current.pty.create({
-        cols,
-        rows,
-        onData: (data: Uint8Array) => {
-          const terminalInfo = terminalsRef.current.get(terminalId);
-          if (terminalInfo?.dataCallback) {
-            terminalInfo.dataCallback(data);
-          }
-        },
-        timeoutMs: 0,
-      });
-
-      terminalsRef.current.set(terminalId, { pid: terminal.pid, dataCallback: onData });
-      return terminal;
-    } catch (error: any) {
-      console.error('Failed to create terminal:', error);
-      setState(prev => ({ ...prev, error: error.message }));
-      return null;
-    }
-  }, []);
-
-  const sendTerminalInput = useCallback(async (terminalId: string, data: string) => {
-    const terminalInfo = terminalsRef.current.get(terminalId);
-    if (!sandboxRef.current || !terminalInfo) {
-      return;
-    }
-
-    try {
-      await sandboxRef.current.pty.sendInput(
-        terminalInfo.pid,
-        new TextEncoder().encode(data)
-      );
-    } catch (error: any) {
-      console.error('Failed to send terminal input:', error);
-    }
-  }, []);
-
-  const resizeTerminal = useCallback(async (terminalId: string, cols: number, rows: number) => {
-    const terminalInfo = terminalsRef.current.get(terminalId);
-    if (!sandboxRef.current || !terminalInfo) {
-      return;
-    }
-
-    try {
-      await sandboxRef.current.pty.resize(terminalInfo.pid, { cols, rows });
-    } catch (error: any) {
-      console.error('Failed to resize terminal:', error);
-    }
-  }, []);
-
-  const closeTerminal = useCallback(async (terminalId: string) => {
-    const terminalInfo = terminalsRef.current.get(terminalId);
-    if (!sandboxRef.current || !terminalInfo) {
-      return;
-    }
-
-    try {
-      await sandboxRef.current.pty.kill(terminalInfo.pid);
-      terminalsRef.current.delete(terminalId);
-    } catch (error: any) {
-      console.error('Failed to close terminal:', error);
-    }
-  }, []);
-
-  const writeFile = useCallback(async (path: string, content: string) => {
-    if (!sandboxRef.current) {
-      return false;
-    }
-
-    try {
-      await sandboxRef.current.files.write(path, content);
-      return true;
-    } catch (error: any) {
-      console.error('Failed to write file:', error);
-      return false;
-    }
-  }, []);
-
-  const readFile = useCallback(async (path: string): Promise<string | null> => {
-    if (!sandboxRef.current) {
-      return null;
-    }
-
-    try {
-      const content = await sandboxRef.current.files.read(path);
-      return content;
-    } catch (error: any) {
-      console.error('Failed to read file:', error);
-      return null;
-    }
-  }, []);
-
-  const listFiles = useCallback(async (path: string) => {
-    if (!sandboxRef.current) {
-      return [];
-    }
-
-    try {
-      const files = await sandboxRef.current.files.list(path);
-      return files;
-    } catch (error: any) {
-      console.error('Failed to list files:', error);
-      return [];
-    }
-  }, []);
-
-  const makeDirectory = useCallback(async (path: string) => {
-    if (!sandboxRef.current) {
-      return false;
-    }
-
-    try {
-      await sandboxRef.current.files.makeDir(path);
-      return true;
-    } catch (error: any) {
-      console.error('Failed to create directory:', error);
-      return false;
-    }
-  }, []);
-
-  const deleteFile = useCallback(async (path: string) => {
-    if (!sandboxRef.current) {
-      return false;
-    }
-
-    try {
-      await sandboxRef.current.files.remove(path);
-      return true;
-    } catch (error: any) {
-      console.error('Failed to delete file:', error);
-      return false;
-    }
-  }, []);
-
-  const getPreviewUrl = useCallback((port: number): string | null => {
-    if (!state.sandboxId) {
-      return null;
-    }
-    return `https://${port}-${state.sandboxId}.e2b.app`;
-  }, [state.sandboxId]);
-
-  const runCommand = useCallback(async (command: string, background: boolean = false) => {
-    if (!sandboxRef.current) {
-      return null;
-    }
-
-    try {
-      const result = await sandboxRef.current.commands.run(command, { background });
-      return result;
-    } catch (error: any) {
-      console.error('Failed to run command:', error);
-      return null;
-    }
-  }, []);
-
-  const disconnectSandbox = useCallback(async () => {
-    stopFileWatcher();
-
-    if (sandboxRef.current) {
-      try {
-        await sandboxRef.current.kill();
-      } catch (error) {
-        console.error('Error killing sandbox:', error);
-      }
-      sandboxRef.current = null;
-      terminalsRef.current.clear();
-    }
-
-    setState(prev => ({
-      ...prev,
-      isConnected: false,
-      sandboxId: null,
-    }));
-  }, [stopFileWatcher]);
-
-  useEffect(() => {
-    return () => {
-      stopFileWatcher();
-    };
-  }, [stopFileWatcher]);
-
-  return {
-    ...state,
-    setApiKey,
-    createSandbox,
-    createTerminal,
-    sendTerminalInput,
-    resizeTerminal,
-    closeTerminal,
-    writeFile,
-    readFile,
-    listFiles,
-    makeDirectory,
-    deleteFile,
-    getPreviewUrl,
-    runCommand,
-    disconnectSandbox,
-    syncLocalToSandbox,
-    syncSandboxToLocal,
-    onFileChange,
-    startFileWatcher,
-    stopFileWatcher,
-    sandbox: sandboxRef.current,
   };
 };
 
@@ -1399,27 +908,24 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({
 
 // SandboxControls Component
 interface SandboxControlsProps {
-  apiKey: string;
   isConnected: boolean;
   isConnecting: boolean;
   sandboxId: string | null;
   error: string | null;
-  onApiKeyChange: (key: string) => void;
+  hasApiKey: boolean;
   onCreateSandbox: () => Promise<any>;
   onDisconnect: () => Promise<void>;
 }
 
 const SandboxControls: React.FC<SandboxControlsProps> = ({
-  apiKey,
   isConnected,
   isConnecting,
   sandboxId,
   error,
-  onApiKeyChange,
+  hasApiKey,
   onCreateSandbox,
   onDisconnect,
 }) => {
-  const [showApiKey, setShowApiKey] = useState(false);
   const [isExpanded, setIsExpanded] = useState(!isConnected);
 
   return (
@@ -1465,41 +971,13 @@ const SandboxControls: React.FC<SandboxControlsProps> = ({
 
       {isExpanded && (
         <div className="px-4 pb-4 space-y-3">
-          <div className="space-y-1">
-            <label className="text-[10px] text-gray-500 uppercase tracking-wider flex items-center">
-              <Key size={10} className="mr-1" />
-              E2B API Key
-            </label>
-            <div className="relative">
-              <input
-                type={showApiKey ? 'text' : 'password'}
-                value={apiKey}
-                onChange={(e) => onApiKeyChange(e.target.value)}
-                placeholder="e2b_..."
-                disabled={isConnected}
-                className="w-full bg-[#1e1e1e] border border-[#444] rounded px-3 py-2 pr-10 text-sm text-gray-300 
-                  placeholder-gray-600 focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              />
-              <button
-                type="button"
-                onClick={() => setShowApiKey(!showApiKey)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
-              >
-                {showApiKey ? <EyeOff size={14} /> : <Eye size={14} />}
-              </button>
+          {!hasApiKey && (
+            <div className="p-2 bg-yellow-900/20 border border-yellow-800/50 rounded">
+              <p className="text-xs text-yellow-300">
+                E2B API key not configured. Add it in Settings to use the sandbox.
+              </p>
             </div>
-            <p className="text-[10px] text-gray-600">
-              Get your API key from{' '}
-              <a 
-                href="https://e2b.dev/dashboard" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-blue-400 hover:underline"
-              >
-                e2b.dev/dashboard
-              </a>
-            </p>
-          </div>
+          )}
 
           {error && (
             <div className="flex items-start space-x-2 p-2 bg-red-900/20 border border-red-800/50 rounded">
@@ -1512,7 +990,7 @@ const SandboxControls: React.FC<SandboxControlsProps> = ({
             {!isConnected ? (
               <button
                 onClick={onCreateSandbox}
-                disabled={isConnecting || !apiKey}
+                disabled={isConnecting || !hasApiKey}
                 className="flex-1 flex items-center justify-center space-x-2 bg-green-600 hover:bg-green-700 
                   disabled:bg-gray-700 disabled:cursor-not-allowed text-white rounded py-2 px-4 text-sm font-medium
                   transition-colors"
@@ -1896,7 +1374,7 @@ const FileSystemPanel = () => {
     sandboxId,
     error: sandboxError,
     isSyncing: isSandboxSyncing,
-    setApiKey,
+    hasApiKey,
     createSandbox,
     createTerminal,
     sendTerminalInput,
@@ -2088,12 +1566,11 @@ const FileSystemPanel = () => {
             style={{ width: sidebarWidth }}
           >
             <SandboxControls
-              apiKey={apiKey}
               isConnected={isConnected}
               isConnecting={isConnecting}
               sandboxId={sandboxId}
               error={sandboxError}
-              onApiKeyChange={setApiKey}
+              hasApiKey={hasApiKey}
               onCreateSandbox={createSandbox}
               onDisconnect={disconnectSandbox}
             />

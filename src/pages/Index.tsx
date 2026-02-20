@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { TopBar } from '@/components/chat/TopBar';
 import { ChatMessages } from '@/components/chat/ChatMessages';
 import { ChatInput } from '@/components/chat/ChatInput';
@@ -6,6 +6,7 @@ import { SettingsModal } from '@/components/chat/SettingsModal';
 import { BottomPanel } from '@/components/filesystem/BottomPanel';
 import { useModels } from '@/hooks/useModels';
 import { useChatMessages } from '@/hooks/useChatMessages';
+import { useE2BSandbox } from '@/contexts/E2BSandboxContext';
 
 const STORAGE_KEY_API = 'neuralchat_apikey';
 const STORAGE_KEY_MODEL = 'neuralchat_model';
@@ -17,9 +18,19 @@ const Index = () => {
   );
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [bottomPanelOpen, setBottomPanelOpen] = useState(false);
+  const sandboxCreatedRef = useRef(false);
 
   const { models, loading: modelsLoading, loadModels } = useModels();
   const { messages, isStreaming, sendMessage, clearMessages } = useChatMessages();
+  
+  const {
+    apiKey: e2bApiKey,
+    setApiKey: setE2bApiKey,
+    isConnected: e2bConnected,
+    isConnecting: e2bConnecting,
+    createSandbox,
+    hasApiKey: hasE2bApiKey,
+  } = useE2BSandbox();
 
   // Load models on mount if API key exists
   useEffect(() => {
@@ -35,20 +46,24 @@ const Index = () => {
     }
   }, [models, selectedModel]);
 
-  // Open settings if no API key
+  // Open settings if no API keys
   useEffect(() => {
-    if (!apiKey) {
+    if (!apiKey || !hasE2bApiKey) {
       setSettingsOpen(true);
     }
   }, []);
 
-  const handleSaveApiKey = useCallback(
-    (key: string) => {
-      setApiKey(key);
-      localStorage.setItem(STORAGE_KEY_API, key);
-      if (key) loadModels(key);
+  const handleSaveSettings = useCallback(
+    (openRouterKey: string, e2bKey: string) => {
+      // Save OpenRouter API key
+      setApiKey(openRouterKey);
+      localStorage.setItem(STORAGE_KEY_API, openRouterKey);
+      if (openRouterKey) loadModels(openRouterKey);
+
+      // Save E2B API key
+      setE2bApiKey(e2bKey);
     },
-    [loadModels]
+    [loadModels, setE2bApiKey]
   );
 
   const handleModelSelect = useCallback((id: string) => {
@@ -57,15 +72,26 @@ const Index = () => {
   }, []);
 
   const handleSend = useCallback(
-    (content: string) => {
-      if (!apiKey || !selectedModel) return;
+    async (content: string) => {
+      if (!apiKey || !selectedModel || !hasE2bApiKey) return;
+
+      // Create sandbox on first message if not already connected
+      if (!e2bConnected && !e2bConnecting && !sandboxCreatedRef.current) {
+        sandboxCreatedRef.current = true;
+        const sandbox = await createSandbox();
+        if (sandbox) {
+          // Open bottom panel to show the sandbox
+          setBottomPanelOpen(true);
+        }
+      }
+
       sendMessage(content, apiKey, selectedModel);
     },
-    [apiKey, selectedModel, sendMessage]
+    [apiKey, selectedModel, hasE2bApiKey, e2bConnected, e2bConnecting, createSandbox, sendMessage]
   );
 
   const selectedModelInfo = models.find((m) => m.id === selectedModel);
-  const canChat = !!apiKey && !!selectedModel;
+  const canChat = !!apiKey && !!selectedModel && hasE2bApiKey;
 
   return (
     <div className="relative flex flex-col h-screen-safe overflow-hidden" style={{ background: '#000' }}>
@@ -93,16 +119,28 @@ const Index = () => {
           onSend={handleSend}
           isStreaming={isStreaming}
           disabled={!canChat}
+          placeholder={
+            !hasE2bApiKey
+              ? "Add E2B API key in settings to start chatting..."
+              : !apiKey
+              ? "Add OpenRouter API key in settings..."
+              : !selectedModel
+              ? "Select a model to start chatting..."
+              : "Type your message..."
+          }
         />
       </div>
 
       {settingsOpen && (
         <SettingsModal
           apiKey={apiKey}
-          onSave={handleSaveApiKey}
+          e2bApiKey={e2bApiKey}
+          onSave={handleSaveSettings}
           onClose={() => setSettingsOpen(false)}
           modelCount={models.length}
           modelsLoading={modelsLoading}
+          e2bConnected={e2bConnected}
+          e2bConnecting={e2bConnecting}
         />
       )}
 
