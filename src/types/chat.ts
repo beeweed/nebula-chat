@@ -1,8 +1,17 @@
+export interface FileWriteEvent {
+  id: string;
+  filePath: string;
+  content: string;
+  success: boolean;
+  message: string;
+}
+
 export interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  fileWrites?: FileWriteEvent[];
 }
 
 export interface OpenRouterModel {

@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useCallback } from 'react';
 import { Bot, User, Copy, Check } from 'lucide-react';
 import { Message } from '@/types/chat';
 import { MarkdownRenderer } from './MarkdownRenderer';
+import { FileWriteBlock } from './FileWriteBlock';
 import { cn } from '@/lib/utils';
 
 interface ChatMessagesProps {
@@ -220,9 +221,26 @@ function MessageRow({
           {showTypingDots ? (
             <TypingDots />
           ) : (
-            <div className="prose-content pr-6 sm:pr-8">
-              <MarkdownRenderer content={message.content} isStreaming={isStreamingThis} />
-            </div>
+            <>
+              <div className="prose-content pr-6 sm:pr-8">
+                <MarkdownRenderer content={message.content} isStreaming={isStreamingThis} />
+              </div>
+              
+              {/* File Write Blocks */}
+              {message.fileWrites && message.fileWrites.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  {message.fileWrites.map((fw) => (
+                    <FileWriteBlock
+                      key={fw.id}
+                      filePath={fw.filePath}
+                      content={fw.content}
+                      success={fw.success}
+                      message={fw.message}
+                    />
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </div>
       )}

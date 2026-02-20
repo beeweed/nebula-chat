@@ -1,23 +1,25 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { Message } from '@/types/chat';
-import { streamChat } from '@/lib/openrouter';
+import { Message, FileWriteEvent } from '@/types/chat';
+import { streamChatWithTools, ToolCallEvent } from '@/lib/openrouter';
 
-// High-performance streaming hook with RAF-based batching
-export function useChatMessages() {
+interface UseChatMessagesOptions {
+  writeFile?: (path: string, content: string) => Promise<boolean>;
+  makeDirectory?: (path: string) => Promise<boolean>;
+}
+
+export function useChatMessages(options: UseChatMessagesOptions = {}) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   
-  // Refs for high-performance streaming - avoid state updates on every chunk
   const streamingIdRef = useRef<string | null>(null);
   const streamingContentRef = useRef<string>('');
   const rafIdRef = useRef<number | null>(null);
   const lastUpdateTimeRef = useRef<number>(0);
   const pendingUpdateRef = useRef<boolean>(false);
+  const fileWritesRef = useRef<FileWriteEvent[]>([]);
   
-  // Expose streaming content via ref for direct DOM access
   const streamingContent = useRef<string>('');
   
-  // Batched state update using RAF - targets 90fps (11ms)
   const scheduleUpdate = useCallback((assistantId: string) => {
     if (pendingUpdateRef.current) return;
     
@@ -27,22 +29,31 @@ export function useChatMessages() {
       const now = performance.now();
       const timeSinceLastUpdate = now - lastUpdateTimeRef.current;
       
-      // Target ~90fps = 11ms between updates, but batch for efficiency
       if (timeSinceLastUpdate >= 11) {
         const content = streamingContentRef.current;
+        const currentFileWrites = [...fileWritesRef.current];
+        
         setMessages((prev) => {
           const lastMsg = prev[prev.length - 1];
-          if (lastMsg?.id === assistantId && lastMsg.content !== content) {
-            const newMessages = [...prev];
-            newMessages[newMessages.length - 1] = { ...lastMsg, content };
-            return newMessages;
+          if (lastMsg?.id === assistantId) {
+            const needsUpdate = lastMsg.content !== content || 
+              JSON.stringify(lastMsg.fileWrites) !== JSON.stringify(currentFileWrites);
+            
+            if (needsUpdate) {
+              const newMessages = [...prev];
+              newMessages[newMessages.length - 1] = { 
+                ...lastMsg, 
+                content,
+                fileWrites: currentFileWrites.length > 0 ? currentFileWrites : undefined
+              };
+              return newMessages;
+            }
           }
           return prev;
         });
         lastUpdateTimeRef.current = now;
         pendingUpdateRef.current = false;
       } else {
-        // Schedule next frame if we're throttling
         rafIdRef.current = requestAnimationFrame(performUpdate);
       }
     };
@@ -50,7 +61,6 @@ export function useChatMessages() {
     rafIdRef.current = requestAnimationFrame(performUpdate);
   }, []);
 
-  // Cleanup RAF on unmount
   useEffect(() => {
     return () => {
       if (rafIdRef.current) {
@@ -77,12 +87,14 @@ export function useChatMessages() {
       streamingContentRef.current = '';
       streamingContent.current = '';
       lastUpdateTimeRef.current = 0;
+      fileWritesRef.current = [];
 
       const assistantMsg: Message = {
         id: assistantId,
         role: 'assistant',
         content: '',
         timestamp: new Date(),
+        fileWrites: [],
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
@@ -93,28 +105,46 @@ export function useChatMessages() {
         content: m.content,
       }));
 
-      await streamChat(
+      const handleToolCall = (event: ToolCallEvent) => {
+        const fileWriteEvent: FileWriteEvent = {
+          id: event.toolCallId,
+          filePath: event.filePath,
+          content: event.content,
+          success: event.result.success,
+          message: event.result.message,
+        };
+        
+        fileWritesRef.current = [...fileWritesRef.current, fileWriteEvent];
+        scheduleUpdate(assistantId);
+      };
+
+      await streamChatWithTools({
         apiKey,
         model,
-        historyMessages,
-        (chunk) => {
-          // Accumulate in ref - NO state update per chunk
+        messages: historyMessages,
+        onChunk: (chunk) => {
           streamingContentRef.current += chunk;
           streamingContent.current = streamingContentRef.current;
-          
-          // Schedule batched RAF update
           scheduleUpdate(assistantId);
         },
-        () => {
-          // Final update with complete content
+        onToolCall: handleToolCall,
+        onDone: () => {
           if (rafIdRef.current) {
             cancelAnimationFrame(rafIdRef.current);
           }
           
           const finalContent = streamingContentRef.current;
+          const finalFileWrites = [...fileWritesRef.current];
+          
           setMessages((prev) =>
             prev.map((m) =>
-              m.id === assistantId ? { ...m, content: finalContent } : m
+              m.id === assistantId 
+                ? { 
+                    ...m, 
+                    content: finalContent,
+                    fileWrites: finalFileWrites.length > 0 ? finalFileWrites : undefined
+                  } 
+                : m
             )
           );
           
@@ -122,8 +152,9 @@ export function useChatMessages() {
           streamingIdRef.current = null;
           streamingContentRef.current = '';
           pendingUpdateRef.current = false;
+          fileWritesRef.current = [];
         },
-        (error) => {
+        onError: (error) => {
           if (rafIdRef.current) {
             cancelAnimationFrame(rafIdRef.current);
           }
@@ -132,6 +163,7 @@ export function useChatMessages() {
           streamingIdRef.current = null;
           streamingContentRef.current = '';
           pendingUpdateRef.current = false;
+          fileWritesRef.current = [];
           
           setMessages((prev) =>
             prev.map((m) =>
@@ -140,16 +172,19 @@ export function useChatMessages() {
                 : m
             )
           );
-        }
-      );
+        },
+        writeFile: options.writeFile || (async () => false),
+        makeDirectory: options.makeDirectory || (async () => false),
+      });
     },
-    [messages, isStreaming, scheduleUpdate]
+    [messages, isStreaming, scheduleUpdate, options.writeFile, options.makeDirectory]
   );
 
   const clearMessages = useCallback(() => {
     setMessages([]);
     streamingContentRef.current = '';
     streamingContent.current = '';
+    fileWritesRef.current = [];
   }, []);
 
   return { 
@@ -157,6 +192,6 @@ export function useChatMessages() {
     isStreaming, 
     sendMessage, 
     clearMessages,
-    streamingContent, // Expose ref for direct access
+    streamingContent,
   };
 }

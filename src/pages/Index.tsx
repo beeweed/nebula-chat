@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { TopBar } from '@/components/chat/TopBar';
 import { ChatMessages } from '@/components/chat/ChatMessages';
 import { ChatInput } from '@/components/chat/ChatInput';
@@ -21,7 +21,6 @@ const Index = () => {
   const sandboxCreatedRef = useRef(false);
 
   const { models, loading: modelsLoading, loadModels } = useModels();
-  const { messages, isStreaming, sendMessage } = useChatMessages();
   
   const {
     apiKey: e2bApiKey,
@@ -30,7 +29,16 @@ const Index = () => {
     isConnecting: e2bConnecting,
     createSandbox,
     hasApiKey: hasE2bApiKey,
+    writeFile,
+    makeDirectory,
   } = useE2BSandbox();
+
+  const chatOptions = useMemo(() => ({
+    writeFile,
+    makeDirectory,
+  }), [writeFile, makeDirectory]);
+
+  const { messages, isStreaming, sendMessage } = useChatMessages(chatOptions);
 
   // Load models on mount if API key exists
   useEffect(() => {
