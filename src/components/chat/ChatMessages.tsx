@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useCallback } from 'react';
 import { Bot, User, Copy, Check } from 'lucide-react';
 import { Message } from '@/types/chat';
 import { MarkdownRenderer } from './MarkdownRenderer';
@@ -12,7 +12,7 @@ interface ChatMessagesProps {
 // Typing dots animation shown before first chunk arrives
 function TypingDots() {
   return (
-    <div className="flex items-center gap-1.5 py-1">
+    <div className="flex items-center gap-1.5 py-1 h-6">
       {[0, 1, 2].map((i) => (
         <span
           key={i}
@@ -48,11 +48,81 @@ function CopyButton({ text }: { text: string }) {
 }
 
 export function ChatMessages({ messages, isStreaming }: ChatMessagesProps) {
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const isUserNearBottomRef = useRef(true);
+  const scrollRAFRef = useRef<number | null>(null);
+  const lastScrollTimeRef = useRef<number>(0);
 
+  // Check if user is near the bottom of the scroll container
+  const checkIfNearBottom = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return true;
+    
+    const threshold = 150; // pixels from bottom to consider "near bottom"
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    return distanceFromBottom < threshold;
+  }, []);
+
+  // Smooth scroll to bottom with throttling
+  const scrollToBottom = useCallback((force = false) => {
+    const container = containerRef.current;
+    if (!container) return;
+    
+    // Only auto-scroll if user is near bottom or forced
+    if (!force && !isUserNearBottomRef.current) return;
+    
+    // Throttle scroll updates during streaming (every 50ms)
+    const now = performance.now();
+    if (now - lastScrollTimeRef.current < 50) {
+      // Schedule a scroll at the end of the throttle period
+      if (!scrollRAFRef.current) {
+        scrollRAFRef.current = requestAnimationFrame(() => {
+          scrollRAFRef.current = null;
+          scrollToBottom(force);
+        });
+      }
+      return;
+    }
+    lastScrollTimeRef.current = now;
+    
+    // Use scrollTop for smoother control
+    const targetScroll = container.scrollHeight - container.clientHeight;
+    container.scrollTop = targetScroll;
+  }, []);
+
+  // Track user scroll position
+  const handleScroll = useCallback(() => {
+    isUserNearBottomRef.current = checkIfNearBottom();
+  }, [checkIfNearBottom]);
+
+  // Scroll on new messages - uses messages.length intentionally to avoid 
+  // triggering on every streaming content update
+  const messagesLength = messages.length;
+  const lastMsgRole = messages[messagesLength - 1]?.role;
+  
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isStreaming]);
+    // Force scroll when a new user message arrives
+    if (lastMsgRole === 'user') {
+      isUserNearBottomRef.current = true;
+      scrollToBottom(true);
+    }
+  }, [messagesLength, lastMsgRole, scrollToBottom]);
+
+  // Smooth scroll during streaming
+  useEffect(() => {
+    if (isStreaming) {
+      scrollToBottom();
+    }
+  }, [messages, isStreaming, scrollToBottom]);
+
+  // Cleanup RAF on unmount
+  useEffect(() => {
+    return () => {
+      if (scrollRAFRef.current) {
+        cancelAnimationFrame(scrollRAFRef.current);
+      }
+    };
+  }, []);
 
   const lastMsg = messages[messages.length - 1];
   // Show typing dots only when streaming has started but no content yet
@@ -60,7 +130,10 @@ export function ChatMessages({ messages, isStreaming }: ChatMessagesProps) {
     isStreaming && lastMsg?.role === 'assistant' && lastMsg?.content === '';
 
   return (
-    <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6">
+    <div 
+      ref={containerRef}
+      onScroll={handleScroll}
+      className="flex-1 overflow-y-auto px-4 py-6 space-y-6 scroll-smooth">
       {messages.length === 0 && (
         <div className="flex flex-col items-center justify-center h-full min-h-[40vh] text-center animate-fade-in">
           <div className="w-20 h-20 rounded-2xl glass-panel border border-primary/30 flex items-center justify-center mb-6 shadow-glow-orange-sm">
@@ -85,7 +158,8 @@ export function ChatMessages({ messages, isStreaming }: ChatMessagesProps) {
         />
       ))}
 
-      <div ref={bottomRef} />
+      {/* Spacer for scroll padding */}
+      <div className="h-4" aria-hidden="true" />
     </div>
   );
 }

@@ -16,25 +16,26 @@ interface MarkdownRendererProps {
   isStreaming?: boolean;
 }
 
-// Streaming cursor component
+// Streaming cursor component - inline to prevent layout shifts
 function StreamingCursor() {
   return (
-    <span className="inline-flex items-center ml-0.5">
-      <span className="inline-block w-2 h-4 bg-accent animate-streaming-cursor rounded-sm" />
-    </span>
+    <span 
+      className="inline-block w-0.5 h-[1.1em] bg-accent animate-streaming-cursor rounded-sm ml-0.5 align-middle"
+      style={{ verticalAlign: 'text-bottom' }}
+    />
   );
 }
 
 // Fast plain text renderer for streaming - no markdown parsing
+// Uses a stable container with CSS containment to prevent layout thrashing
 const StreamingPlainText = memo(function StreamingPlainText({ content }: { content: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const prevContentRef = useRef(content);
   
-  // Direct DOM update for maximum performance
+  // Use layout effect for synchronous DOM updates - prevents flicker
   useEffect(() => {
-    if (containerRef.current && content !== prevContentRef.current) {
+    if (containerRef.current) {
+      // Direct textContent update is faster than React reconciliation
       containerRef.current.textContent = content;
-      prevContentRef.current = content;
     }
   }, [content]);
 
@@ -42,6 +43,10 @@ const StreamingPlainText = memo(function StreamingPlainText({ content }: { conte
     <div 
       ref={containerRef}
       className="whitespace-pre-wrap break-words text-foreground/90 leading-relaxed"
+      style={{ 
+        contain: 'content',
+        minHeight: '1.5em',
+      }}
     >
       {content}
     </div>
@@ -543,9 +548,11 @@ export function MarkdownRenderer({ content, isStreaming = false }: MarkdownRende
   // During streaming: show plain text for performance
   if (isStreaming && showPlainText) {
     return (
-      <div className="markdown-content">
-        <StreamingPlainText content={content} />
-        <StreamingCursor />
+      <div className="markdown-content" style={{ contain: 'layout style' }}>
+        <span className="streaming-text-container">
+          <StreamingPlainText content={content} />
+          <StreamingCursor />
+        </span>
       </div>
     );
   }
