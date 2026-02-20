@@ -1,18 +1,28 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { X, GripHorizontal, Code2, Maximize2, Minimize2 } from 'lucide-react';
+import { X, GripHorizontal, Code2, Maximize2, Minimize2, FolderCode, TerminalSquare, Globe } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import FileSystemPanel from './FileSystemPanel';
+import { FilesTab } from './tabs/FilesTab';
+import { TerminalTab } from './tabs/TerminalTab';
+import { PreviewTab } from './tabs/PreviewTab';
 
 interface BottomPanelProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
+type TabType = 'files' | 'terminal' | 'preview';
+
 const MIN_HEIGHT = 200;
-const HEADER_OFFSET = 60; // Space for the app header
-const MOBILE_BREAKPOINT = 640; // sm breakpoint
+const HEADER_OFFSET = 60;
+const MOBILE_BREAKPOINT = 640;
 const getDefaultHeight = () => Math.round(window.innerHeight * 0.75);
 const isMobileView = () => typeof window !== 'undefined' && window.innerWidth < MOBILE_BREAKPOINT;
+
+const tabs: { id: TabType; label: string; icon: React.ReactNode }[] = [
+  { id: 'files', label: 'Files', icon: <FolderCode size={16} /> },
+  { id: 'terminal', label: 'Terminal', icon: <TerminalSquare size={16} /> },
+  { id: 'preview', label: 'Preview', icon: <Globe size={16} /> },
+];
 
 export function BottomPanel({ isOpen, onClose }: BottomPanelProps) {
   const [height, setHeight] = useState(getDefaultHeight);
@@ -21,12 +31,12 @@ export function BottomPanel({ isOpen, onClose }: BottomPanelProps) {
   const [isMaximized, setIsMaximized] = useState(false);
   const [maxHeight, setMaxHeight] = useState(window.innerHeight - HEADER_OFFSET);
   const [isMobile, setIsMobile] = useState(isMobileView);
+  const [activeTab, setActiveTab] = useState<TabType>('files');
   const panelRef = useRef<HTMLDivElement>(null);
   const startYRef = useRef(0);
   const startHeightRef = useRef(0);
   const prevHeightRef = useRef(getDefaultHeight());
 
-  // Update max height and mobile state on window resize
   useEffect(() => {
     const updateDimensions = () => {
       setMaxHeight(window.innerHeight - HEADER_OFFSET);
@@ -36,7 +46,6 @@ export function BottomPanel({ isOpen, onClose }: BottomPanelProps) {
     return () => window.removeEventListener('resize', updateDimensions);
   }, []);
 
-  // On mobile, always use full height
   const effectiveHeight = isMobile ? window.innerHeight : height;
 
   useEffect(() => {
@@ -61,7 +70,6 @@ export function BottomPanel({ isOpen, onClose }: BottomPanelProps) {
     startHeightRef.current = height;
   }, [height]);
 
-  // Toggle maximize
   const toggleMaximize = useCallback(() => {
     if (isMaximized) {
       setHeight(prevHeightRef.current);
@@ -109,6 +117,8 @@ export function BottomPanel({ isOpen, onClose }: BottomPanelProps) {
       document.removeEventListener('touchcancel', handleEnd);
     };
   }, [isResizing, maxHeight]);
+
+  const contentHeight = isMobile ? 'calc(100% - 100px)' : 'calc(100% - 100px)';
 
   return (
     <>
@@ -164,21 +174,60 @@ export function BottomPanel({ isOpen, onClose }: BottomPanelProps) {
           </div>
         )}
 
+        {/* Header with tabs */}
         <div 
           className={cn(
-            'h-12 sm:h-10 bg-[#252526] border-b border-[#333] flex items-center justify-between px-3 sm:px-4',
+            'bg-[#252526] border-b border-[#333] flex items-center justify-between',
             !isMobile && 'mt-4'
           )} 
           data-design-id="bottom-panel-header"
         >
-          <div className="flex items-center gap-2">
-            <Code2 size={16} className="text-primary" />
-            <span className="text-sm font-medium text-gray-300" data-design-id="bottom-panel-title">Code Sandbox</span>
-            <span className="text-xs text-gray-500 px-2 py-0.5 bg-[#333] rounded hidden sm:inline" data-design-id="bottom-panel-badge">E2B</span>
+          {/* Left side: Title and Tabs */}
+          <div className="flex items-center flex-1">
+            <div className="flex items-center gap-2 px-4 py-2 border-r border-[#333]">
+              <Code2 size={16} className="text-primary" />
+              <span className="text-sm font-medium text-gray-300 hidden sm:inline" data-design-id="bottom-panel-title">
+                Code Sandbox
+              </span>
+              <span className="text-xs text-gray-500 px-2 py-0.5 bg-[#333] rounded hidden sm:inline" data-design-id="bottom-panel-badge">
+                E2B
+              </span>
+            </div>
+            
+            {/* Tabs */}
+            <div className="flex items-center" data-design-id="bottom-panel-tabs">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={cn(
+                    'flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all relative',
+                    'hover:bg-[#2a2a2b]',
+                    activeTab === tab.id 
+                      ? 'text-primary bg-[#1e1e1e]' 
+                      : 'text-gray-400 hover:text-gray-200'
+                  )}
+                  data-design-id={`bottom-panel-tab-${tab.id}`}
+                >
+                  <span className={cn(
+                    'transition-colors',
+                    activeTab === tab.id ? 'text-primary' : 'text-gray-500'
+                  )}>
+                    {tab.icon}
+                  </span>
+                  <span className="hidden sm:inline">{tab.label}</span>
+                  
+                  {/* Active indicator */}
+                  {activeTab === tab.id && (
+                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
+                  )}
+                </button>
+              ))}
+            </div>
           </div>
           
-          <div className="flex items-center gap-1">
-            {/* Only show maximize button on desktop */}
+          {/* Right side: Controls */}
+          <div className="flex items-center gap-1 px-2">
             {!isMobile && (
               <button
                 onClick={toggleMaximize}
@@ -200,12 +249,15 @@ export function BottomPanel({ isOpen, onClose }: BottomPanelProps) {
           </div>
         </div>
 
+        {/* Tab Content */}
         <div 
-          className="overflow-hidden" 
-          style={{ height: isMobile ? 'calc(100% - 48px)' : 'calc(100% - 56px)' }}
+          className="overflow-hidden bg-[#1e1e1e]" 
+          style={{ height: contentHeight }}
           data-design-id="bottom-panel-content"
         >
-          <FileSystemPanel />
+          {activeTab === 'files' && <FilesTab />}
+          {activeTab === 'terminal' && <TerminalTab />}
+          {activeTab === 'preview' && <PreviewTab />}
         </div>
       </div>
     </>
