@@ -24,7 +24,6 @@ import {
   ChevronRight, 
   ChevronDown,
   Play, 
-  Square, 
   CheckCircle, 
   AlertCircle,
   Cloud,
@@ -914,7 +913,6 @@ interface SandboxControlsProps {
   error: string | null;
   hasApiKey: boolean;
   onCreateSandbox: () => Promise<any>;
-  onDisconnect: () => Promise<void>;
 }
 
 const SandboxControls: React.FC<SandboxControlsProps> = ({
@@ -924,7 +922,6 @@ const SandboxControls: React.FC<SandboxControlsProps> = ({
   error,
   hasApiKey,
   onCreateSandbox,
-  onDisconnect,
 }) => {
   const [isExpanded, setIsExpanded] = useState(!isConnected);
 
@@ -986,8 +983,8 @@ const SandboxControls: React.FC<SandboxControlsProps> = ({
             </div>
           )}
 
-          <div className="flex space-x-2">
-            {!isConnected ? (
+          {!isConnected && (
+            <div className="flex space-x-2">
               <button
                 onClick={onCreateSandbox}
                 disabled={isConnecting || !hasApiKey}
@@ -1007,17 +1004,8 @@ const SandboxControls: React.FC<SandboxControlsProps> = ({
                   </>
                 )}
               </button>
-            ) : (
-              <button
-                onClick={onDisconnect}
-                className="flex-1 flex items-center justify-center space-x-2 bg-red-600 hover:bg-red-700 
-                  text-white rounded py-2 px-4 text-sm font-medium transition-colors"
-              >
-                <Square size={14} />
-                <span>Stop Sandbox</span>
-              </button>
-            )}
-          </div>
+            </div>
+          )}
 
           {isConnected && sandboxId && (
             <div className="p-2 bg-[#1e1e1e] rounded border border-[#333]">
@@ -1383,7 +1371,6 @@ const FileSystemPanel = () => {
     writeFile,
     makeDirectory,
     deleteFile,
-    disconnectSandbox,
     syncLocalToSandbox,
     syncSandboxToLocal,
     onFileChange,
@@ -1432,6 +1419,29 @@ const FileSystemPanel = () => {
       unsubscribe();
     };
   }, [isConnected, onFileChange]);
+
+  // Auto-sync every 4 seconds when connected
+  useEffect(() => {
+    if (!isConnected) return;
+
+    const autoSyncInterval = setInterval(async () => {
+      if (!isSandboxSyncing && !isLocalSyncing) {
+        setSyncStatus('syncing');
+        const sandboxFiles = await syncSandboxToLocal();
+        if (sandboxFiles.length > 0) {
+          replaceWithSandboxFiles(sandboxFiles);
+          setSyncStatus('success');
+          setLastSyncTime(new Date());
+        } else {
+          setSyncStatus('idle');
+        }
+      }
+    }, 4000);
+
+    return () => {
+      clearInterval(autoSyncInterval);
+    };
+  }, [isConnected, isSandboxSyncing, isLocalSyncing, syncSandboxToLocal, replaceWithSandboxFiles]);
 
   const handleInitialSync = useCallback(async () => {
     if (!isConnected) return;
@@ -1572,7 +1582,6 @@ const FileSystemPanel = () => {
               error={sandboxError}
               hasApiKey={hasApiKey}
               onCreateSandbox={createSandbox}
-              onDisconnect={disconnectSandbox}
             />
 
             {isConnected && (

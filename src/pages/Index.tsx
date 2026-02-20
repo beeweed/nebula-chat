@@ -21,7 +21,7 @@ const Index = () => {
   const sandboxCreatedRef = useRef(false);
 
   const { models, loading: modelsLoading, loadModels } = useModels();
-  const { messages, isStreaming, sendMessage, clearMessages } = useChatMessages();
+  const { messages, isStreaming, sendMessage } = useChatMessages();
   
   const {
     apiKey: e2bApiKey,
@@ -78,11 +78,7 @@ const Index = () => {
       // Create sandbox on first message if not already connected
       if (!e2bConnected && !e2bConnecting && !sandboxCreatedRef.current) {
         sandboxCreatedRef.current = true;
-        const sandbox = await createSandbox();
-        if (sandbox) {
-          // Open bottom panel to show the sandbox
-          setBottomPanelOpen(true);
-        }
+        await createSandbox();
       }
 
       sendMessage(content, apiKey, selectedModel);
@@ -104,9 +100,7 @@ const Index = () => {
           onModelSelect={handleModelSelect}
           modelsLoading={modelsLoading}
           onSettingsOpen={() => setSettingsOpen(true)}
-          onClearChat={clearMessages}
           onCodeSandboxOpen={() => setBottomPanelOpen(true)}
-          messageCount={messages.length}
           selectedModelInfo={selectedModelInfo}
         />
 

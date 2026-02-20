@@ -1,4 +1,4 @@
-import { Settings, Bot, Trash2, MessageSquare, Code2 } from 'lucide-react';
+import { Settings, Bot, MessageSquare, Code2 } from 'lucide-react';
 import { OpenRouterModel } from '@/types/chat';
 import { ModelSelector } from './ModelSelector';
 import { cn } from '@/lib/utils';
@@ -9,9 +9,7 @@ interface TopBarProps {
   onModelSelect: (id: string) => void;
   modelsLoading: boolean;
   onSettingsOpen: () => void;
-  onClearChat: () => void;
   onCodeSandboxOpen: () => void;
-  messageCount: number;
   selectedModelInfo?: OpenRouterModel;
 }
 
@@ -21,9 +19,7 @@ export function TopBar({
   onModelSelect,
   modelsLoading,
   onSettingsOpen,
-  onClearChat,
   onCodeSandboxOpen,
-  messageCount,
   selectedModelInfo,
 }: TopBarProps) {
   return (
@@ -59,19 +55,6 @@ export function TopBar({
             onSelect={onModelSelect}
             loading={modelsLoading}
           />
-
-          {messageCount > 0 && (
-            <button
-              onClick={onClearChat}
-              title="Clear chat"
-              className={cn(
-                'w-8 h-8 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl glass-panel glow-border flex items-center justify-center',
-                'text-muted-foreground hover:text-destructive active:scale-95 transition-all duration-200'
-              )}
-            >
-              <Trash2 size={14} className="sm:w-4 sm:h-4" />
-            </button>
-          )}
 
           <button
             onClick={onCodeSandboxOpen}
