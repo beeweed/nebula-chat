@@ -10,7 +10,9 @@ interface BottomPanelProps {
 
 const MIN_HEIGHT = 200;
 const HEADER_OFFSET = 60; // Space for the app header
+const MOBILE_BREAKPOINT = 640; // sm breakpoint
 const getDefaultHeight = () => Math.round(window.innerHeight * 0.75);
+const isMobileView = () => typeof window !== 'undefined' && window.innerWidth < MOBILE_BREAKPOINT;
 
 export function BottomPanel({ isOpen, onClose }: BottomPanelProps) {
   const [height, setHeight] = useState(getDefaultHeight);
@@ -18,19 +20,24 @@ export function BottomPanel({ isOpen, onClose }: BottomPanelProps) {
   const [isAnimating, setIsAnimating] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
   const [maxHeight, setMaxHeight] = useState(window.innerHeight - HEADER_OFFSET);
+  const [isMobile, setIsMobile] = useState(isMobileView);
   const panelRef = useRef<HTMLDivElement>(null);
   const startYRef = useRef(0);
   const startHeightRef = useRef(0);
   const prevHeightRef = useRef(getDefaultHeight());
 
-  // Update max height on window resize
+  // Update max height and mobile state on window resize
   useEffect(() => {
-    const updateMaxHeight = () => {
+    const updateDimensions = () => {
       setMaxHeight(window.innerHeight - HEADER_OFFSET);
+      setIsMobile(isMobileView());
     };
-    window.addEventListener('resize', updateMaxHeight);
-    return () => window.removeEventListener('resize', updateMaxHeight);
+    window.addEventListener('resize', updateDimensions);
+    return () => window.removeEventListener('resize', updateDimensions);
   }, []);
+
+  // On mobile, always use full height
+  const effectiveHeight = isMobile ? window.innerHeight : height;
 
   useEffect(() => {
     if (isOpen) {
@@ -105,7 +112,7 @@ export function BottomPanel({ isOpen, onClose }: BottomPanelProps) {
 
   return (
     <>
-      {isResizing && isOpen && (
+      {isResizing && isOpen && !isMobile && (
         <div 
           className="fixed inset-0 z-40 cursor-row-resize" 
           style={{ touchAction: 'none' }}
@@ -115,74 +122,87 @@ export function BottomPanel({ isOpen, onClose }: BottomPanelProps) {
       <div
         ref={panelRef}
         className={cn(
-          'fixed bottom-0 left-0 right-0 z-50 bg-[#1e1e1e] border-t border-primary/30',
+          'fixed bottom-0 left-0 right-0 z-50 bg-[#1e1e1e]',
+          'sm:border-t sm:border-primary/30',
           'shadow-[0_-4px_30px_rgba(0,0,0,0.5)]',
           isAnimating && 'animate-slide-up',
           !isOpen && 'translate-y-full pointer-events-none'
         )}
         style={{ 
-          height: `${height}px`,
+          height: isMobile ? '100%' : `${effectiveHeight}px`,
           transition: isResizing ? 'none' : 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
         }}
         data-design-id="bottom-panel"
       >
-        <div
-          onMouseDown={handleMouseDown}
-          onTouchStart={handleTouchStart}
-          onDoubleClick={toggleMaximize}
-          className={cn(
-            'absolute top-0 left-0 right-0 h-4 cursor-row-resize',
-            'flex items-center justify-center group',
-            'bg-gradient-to-b from-[#333] to-transparent',
-            'hover:from-primary/30 transition-colors',
-            isResizing && 'from-primary/50'
-          )}
-          data-design-id="bottom-panel-resize-handle"
-        >
-          <div className={cn(
-            'w-12 h-1 rounded-full transition-colors',
-            isResizing ? 'bg-primary' : 'bg-gray-600 group-hover:bg-primary/70'
-          )}>
-            <GripHorizontal 
-              size={12} 
-              className={cn(
-                'mx-auto -mt-0.5 transition-colors',
-                isResizing ? 'text-primary' : 'text-gray-500 group-hover:text-primary/70'
-              )} 
-            />
+        {/* Resize handle - hidden on mobile */}
+        {!isMobile && (
+          <div
+            onMouseDown={handleMouseDown}
+            onTouchStart={handleTouchStart}
+            onDoubleClick={toggleMaximize}
+            className={cn(
+              'absolute top-0 left-0 right-0 h-4 cursor-row-resize',
+              'flex items-center justify-center group',
+              'bg-gradient-to-b from-[#333] to-transparent',
+              'hover:from-primary/30 transition-colors',
+              isResizing && 'from-primary/50'
+            )}
+            data-design-id="bottom-panel-resize-handle"
+          >
+            <div className={cn(
+              'w-12 h-1 rounded-full transition-colors',
+              isResizing ? 'bg-primary' : 'bg-gray-600 group-hover:bg-primary/70'
+            )}>
+              <GripHorizontal 
+                size={12} 
+                className={cn(
+                  'mx-auto -mt-0.5 transition-colors',
+                  isResizing ? 'text-primary' : 'text-gray-500 group-hover:text-primary/70'
+                )} 
+              />
+            </div>
           </div>
-        </div>
+        )}
 
-        <div className="h-10 bg-[#252526] border-b border-[#333] flex items-center justify-between px-4 mt-4" data-design-id="bottom-panel-header">
+        <div 
+          className={cn(
+            'h-12 sm:h-10 bg-[#252526] border-b border-[#333] flex items-center justify-between px-3 sm:px-4',
+            !isMobile && 'mt-4'
+          )} 
+          data-design-id="bottom-panel-header"
+        >
           <div className="flex items-center gap-2">
             <Code2 size={16} className="text-primary" />
             <span className="text-sm font-medium text-gray-300" data-design-id="bottom-panel-title">Code Sandbox</span>
-            <span className="text-xs text-gray-500 px-2 py-0.5 bg-[#333] rounded" data-design-id="bottom-panel-badge">E2B</span>
+            <span className="text-xs text-gray-500 px-2 py-0.5 bg-[#333] rounded hidden sm:inline" data-design-id="bottom-panel-badge">E2B</span>
           </div>
           
           <div className="flex items-center gap-1">
-            <button
-              onClick={toggleMaximize}
-              className="p-1.5 text-gray-400 hover:text-primary hover:bg-[#444] rounded transition-colors"
-              title={isMaximized ? "Restore panel" : "Maximize panel"}
-              data-design-id="bottom-panel-maximize-btn"
-            >
-              {isMaximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-            </button>
+            {/* Only show maximize button on desktop */}
+            {!isMobile && (
+              <button
+                onClick={toggleMaximize}
+                className="p-1.5 text-gray-400 hover:text-primary hover:bg-[#444] rounded transition-colors"
+                title={isMaximized ? "Restore panel" : "Maximize panel"}
+                data-design-id="bottom-panel-maximize-btn"
+              >
+                {isMaximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+              </button>
+            )}
             <button
               onClick={onClose}
-              className="p-1.5 text-gray-400 hover:text-white hover:bg-[#444] rounded transition-colors"
+              className="p-2 sm:p-1.5 text-gray-400 hover:text-white hover:bg-[#444] rounded transition-colors active:scale-95"
               title="Close panel"
               data-design-id="bottom-panel-close-btn"
             >
-              <X size={16} />
+              <X size={18} className="sm:w-4 sm:h-4" />
             </button>
           </div>
         </div>
 
         <div 
           className="overflow-hidden" 
-          style={{ height: `calc(100% - 56px)` }}
+          style={{ height: isMobile ? 'calc(100% - 48px)' : 'calc(100% - 56px)' }}
           data-design-id="bottom-panel-content"
         >
           <FileSystemPanel />

@@ -133,17 +133,17 @@ export function ChatMessages({ messages, isStreaming }: ChatMessagesProps) {
     <div 
       ref={containerRef}
       onScroll={handleScroll}
-      className="flex-1 overflow-y-auto px-4 py-6 space-y-6 scroll-smooth">
+      className="flex-1 overflow-y-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6 scroll-smooth">
       {messages.length === 0 && (
-        <div className="flex flex-col items-center justify-center h-full min-h-[40vh] text-center animate-fade-in">
-          <div className="w-20 h-20 rounded-2xl glass-panel border border-primary/30 flex items-center justify-center mb-6 shadow-glow-orange-sm">
-            <Bot size={36} className="text-primary" />
+        <div className="flex flex-col items-center justify-center h-full min-h-[40vh] text-center animate-fade-in px-4">
+          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl sm:rounded-2xl glass-panel border border-primary/30 flex items-center justify-center mb-4 sm:mb-6 shadow-glow-orange-sm">
+            <Bot size={28} className="sm:w-9 sm:h-9 text-primary" />
           </div>
-          <h2 className="text-2xl font-semibold text-foreground mb-2">
+          <h2 className="text-xl sm:text-2xl font-semibold text-foreground mb-2">
             How can I assist you today?
           </h2>
-          <p className="text-muted-foreground max-w-md text-sm">
-            Select a model from the top bar and enter your OpenRouter API key in Settings to start chatting.
+          <p className="text-muted-foreground max-w-md text-xs sm:text-sm">
+            Select a model and enter your OpenRouter API key in Settings to start chatting.
           </p>
         </div>
       )}
@@ -181,38 +181,38 @@ function MessageRow({
   return (
     <div
       className={cn(
-        'flex gap-3 animate-message-in group',
+        'flex gap-2 sm:gap-3 animate-message-in group',
         isUser ? 'flex-row-reverse' : 'flex-row'
       )}
     >
       {/* Avatar */}
       <div
         className={cn(
-          'flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center',
+          'flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center',
           isUser
             ? 'bg-primary shadow-glow-orange-sm'
             : 'glass-panel border border-accent/30 shadow-glow-cyan-sm'
         )}
       >
         {isUser ? (
-          <User size={16} className="text-primary-foreground" />
+          <User size={14} className="sm:w-4 sm:h-4 text-primary-foreground" />
         ) : (
-          <Bot size={16} className="text-accent" />
+          <Bot size={14} className="sm:w-4 sm:h-4 text-accent" />
         )}
       </div>
 
       {/* Content */}
       {isUser ? (
         /* User: chat bubble */
-        <div className="relative max-w-[75%] rounded-2xl rounded-tr-sm px-4 py-3 text-sm leading-relaxed chat-bubble-user">
+        <div className="relative max-w-[85%] sm:max-w-[75%] rounded-xl sm:rounded-2xl rounded-tr-sm px-3 sm:px-4 py-2 sm:py-3 text-sm leading-relaxed chat-bubble-user">
           <span className="whitespace-pre-wrap break-words">{message.content}</span>
         </div>
       ) : (
         /* Assistant: NO bubble — plain text on dark background */
-        <div className="relative flex-1 min-w-0 text-sm leading-relaxed text-foreground/90 pt-1">
+        <div className="relative flex-1 min-w-0 text-sm leading-relaxed text-foreground/90 pt-0.5 sm:pt-1">
           {/* Copy button */}
           {message.content && (
-            <div className="absolute top-0 right-0">
+            <div className="absolute top-0 right-0 opacity-0 sm:opacity-0 group-hover:opacity-100 transition-opacity">
               <CopyButton text={message.content} />
             </div>
           )}
@@ -220,7 +220,7 @@ function MessageRow({
           {showTypingDots ? (
             <TypingDots />
           ) : (
-            <div className="prose-content pr-8">
+            <div className="prose-content pr-6 sm:pr-8">
               <MarkdownRenderer content={message.content} isStreaming={isStreamingThis} />
             </div>
           )}

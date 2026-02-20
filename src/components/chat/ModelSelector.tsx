@@ -72,8 +72,8 @@ export function ModelSelector({ models, selectedModel, onSelect, loading }: Mode
         onClick={() => setOpen(!open)}
         disabled={loading || models.length === 0}
         className={cn(
-          'flex items-center gap-2 px-3 py-1.5 rounded-xl glass-panel glow-border',
-          'text-sm font-medium text-foreground min-w-[180px] max-w-[260px]',
+          'flex items-center gap-2 px-2 sm:px-3 py-1.5 rounded-xl glass-panel glow-border',
+          'text-sm font-medium text-foreground min-w-[120px] sm:min-w-[180px] max-w-[180px] sm:max-w-[260px]',
           'transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed',
           open && 'border-primary/50 shadow-glow-orange-sm'
         )}
@@ -98,7 +98,7 @@ export function ModelSelector({ models, selectedModel, onSelect, loading }: Mode
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 mt-2 w-[360px] z-50 animate-scale-in">
+        <div className="absolute top-full right-0 sm:left-0 sm:right-auto mt-2 w-[calc(100vw-2rem)] sm:w-[360px] max-w-[360px] z-50 animate-scale-in">
           <div className="glass-panel rounded-2xl border border-primary/20 shadow-glow-orange-sm overflow-hidden">
             {/* Search */}
             <div className="p-2 border-b border-border">

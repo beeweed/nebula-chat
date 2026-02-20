@@ -52,7 +52,7 @@ export function TopBar({
         )}
 
         {/* Right: Controls */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2">
           <ModelSelector
             models={models}
             selectedModel={selectedModel}
@@ -65,11 +65,11 @@ export function TopBar({
               onClick={onClearChat}
               title="Clear chat"
               className={cn(
-                'w-9 h-9 rounded-xl glass-panel glow-border flex items-center justify-center',
-                'text-muted-foreground hover:text-destructive transition-all duration-200'
+                'w-8 h-8 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl glass-panel glow-border flex items-center justify-center',
+                'text-muted-foreground hover:text-destructive active:scale-95 transition-all duration-200'
               )}
             >
-              <Trash2 size={16} />
+              <Trash2 size={14} className="sm:w-4 sm:h-4" />
             </button>
           )}
 
@@ -77,22 +77,22 @@ export function TopBar({
             onClick={onCodeSandboxOpen}
             title="Open Code Sandbox"
             className={cn(
-              'w-9 h-9 rounded-xl glass-panel glow-border flex items-center justify-center',
-              'text-muted-foreground hover:text-primary transition-all duration-200'
+              'w-8 h-8 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl glass-panel glow-border flex items-center justify-center',
+              'text-muted-foreground hover:text-primary active:scale-95 transition-all duration-200'
             )}
             data-design-id="code-sandbox-toggle-btn"
           >
-            <Code2 size={16} />
+            <Code2 size={14} className="sm:w-4 sm:h-4" />
           </button>
 
           <button
             onClick={onSettingsOpen}
             className={cn(
-              'w-9 h-9 rounded-xl glass-panel glow-border flex items-center justify-center',
-              'text-muted-foreground hover:text-primary transition-all duration-200'
+              'w-8 h-8 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl glass-panel glow-border flex items-center justify-center',
+              'text-muted-foreground hover:text-primary active:scale-95 transition-all duration-200'
             )}
           >
-            <Settings size={16} />
+            <Settings size={14} className="sm:w-4 sm:h-4" />
           </button>
         </div>
       </div>

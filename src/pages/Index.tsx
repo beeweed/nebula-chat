@@ -68,10 +68,10 @@ const Index = () => {
   const canChat = !!apiKey && !!selectedModel;
 
   return (
-    <div className="relative flex flex-col h-screen overflow-hidden" style={{ background: '#000' }}>
+    <div className="relative flex flex-col h-screen-safe overflow-hidden" style={{ background: '#000' }}>
 
       {/* App shell */}
-      <div className="relative z-10 flex flex-col h-full max-w-4xl mx-auto w-full">
+      <div className="relative z-10 flex flex-col h-full max-w-4xl mx-auto w-full px-safe">
         <TopBar
           models={models}
           selectedModel={selectedModel}
