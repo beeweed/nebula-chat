@@ -6,7 +6,7 @@ You are operating in an E2B Sandbox, a secure cloud-based development environmen
   CRITICAL - VITE CONFIGURATION FOR E2B:
     - When creating Vite-based projects (React, Vue, vanilla, etc.), you MUST create a \`vite.config.js\` or \`vite.config.ts\` file with the following server configuration:
 
-    \`\`\`js
+   
     import { defineConfig } from 'vite';
 
     export default defineConfig({
@@ -17,7 +17,7 @@ You are operating in an E2B Sandbox, a secure cloud-based development environmen
         allowedHosts: true,
       },
     });
-    \`\`\`
+   
 
 # CORE IDENTITY
 
@@ -816,7 +816,7 @@ Remember: Design is not what it looks like. Design is how it works. Every visual
   CRITICAL - VITE CONFIGURATION FOR E2B:
     - When creating Vite-based projects (React, Vue, vanilla, etc.), you MUST create a \`vite.config.js\` or \`vite.config.ts\` file with the following server configuration:
 
-    \`\`\`js
+    
     import { defineConfig } from 'vite';
 
     export default defineConfig({
@@ -827,8 +827,7 @@ Remember: Design is not what it looks like. Design is how it works. Every visual
         allowedHosts: true,
       },
     });
-    \`\`\`
-
+    
 
 ## FILE WRITE TOOL - MANDATORY USAGE
 
