@@ -249,15 +249,21 @@ export function BottomPanel({ isOpen, onClose }: BottomPanelProps) {
           </div>
         </div>
 
-        {/* Tab Content */}
+        {/* Tab Content - All tabs are mounted but hidden to preserve state */}
         <div 
           className="overflow-hidden bg-[#1e1e1e]" 
           style={{ height: contentHeight }}
           data-design-id="bottom-panel-content"
         >
-          {activeTab === 'files' && <FilesTab />}
-          {activeTab === 'terminal' && <TerminalTab />}
-          {activeTab === 'preview' && <PreviewTab />}
+          <div className={cn('h-full', activeTab === 'files' ? 'block' : 'hidden')}>
+            <FilesTab />
+          </div>
+          <div className={cn('h-full', activeTab === 'terminal' ? 'block' : 'hidden')}>
+            <TerminalTab />
+          </div>
+          <div className={cn('h-full', activeTab === 'preview' ? 'block' : 'hidden')}>
+            <PreviewTab />
+          </div>
         </div>
       </div>
     </>

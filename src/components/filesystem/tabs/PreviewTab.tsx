@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useE2BSandbox } from '@/contexts/E2BSandboxContext';
+import { usePreview } from '@/contexts/PreviewContext';
 import { 
   Globe, 
   RefreshCw, 
@@ -14,9 +15,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-type DeviceMode = 'desktop' | 'tablet' | 'mobile';
-
-const deviceSizes: Record<DeviceMode, { width: string; label: string }> = {
+const deviceSizes: Record<'desktop' | 'tablet' | 'mobile', { width: string; label: string }> = {
   desktop: { width: '100%', label: 'Desktop' },
   tablet: { width: '768px', label: 'Tablet' },
   mobile: { width: '375px', label: 'Mobile' },
@@ -31,31 +30,40 @@ export function PreviewTab() {
     createSandbox,
   } = useE2BSandbox();
 
-  const [port, setPort] = useState('3000');
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [deviceMode, setDeviceMode] = useState<DeviceMode>('desktop');
-  const [key, setKey] = useState(0);
+  const {
+    port,
+    deviceMode,
+    refreshKey,
+    isLoading,
+    error,
+    setPort,
+    setDeviceMode,
+    refresh,
+    setIsLoading,
+    setError,
+  } = usePreview();
+
+  const previewUrl = sandboxId && port ? (() => {
+    const portNum = parseInt(port, 10);
+    if (!isNaN(portNum) && portNum > 0 && portNum < 65536) {
+      return `https://${portNum}-${sandboxId}.e2b.app`;
+    }
+    return null;
+  })() : null;
 
   useEffect(() => {
     if (sandboxId && port) {
       const portNum = parseInt(port, 10);
-      if (!isNaN(portNum) && portNum > 0 && portNum < 65536) {
-        setPreviewUrl(`https://${portNum}-${sandboxId}.e2b.app`);
-        setError(null);
-      } else {
-        setPreviewUrl(null);
+      if (isNaN(portNum) || portNum <= 0 || portNum >= 65536) {
         setError('Invalid port number');
+      } else {
+        setError(null);
       }
-    } else {
-      setPreviewUrl(null);
     }
-  }, [sandboxId, port]);
+  }, [sandboxId, port, setError]);
 
   const handleRefresh = () => {
-    setKey(prev => prev + 1);
-    setIsLoading(true);
+    refresh();
   };
 
   const handleOpenExternal = () => {
@@ -73,7 +81,6 @@ export function PreviewTab() {
     setError('Failed to load preview. Make sure your server is running on the specified port.');
   };
 
-  // Not connected state
   if (!isConnected) {
     return (
       <div className="h-full flex flex-col items-center justify-center text-gray-500 bg-[#1e1e1e]">
@@ -224,7 +231,7 @@ export function PreviewTab() {
               </div>
             )}
             <iframe
-              key={key}
+              key={refreshKey}
               src={previewUrl}
               className="w-full h-full border-0"
               onLoad={handleIframeLoad}

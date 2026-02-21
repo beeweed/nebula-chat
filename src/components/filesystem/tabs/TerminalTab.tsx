@@ -1,7 +1,8 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect, useCallback } from 'react';
 import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { useE2BSandbox } from '@/contexts/E2BSandboxContext';
+import { useTerminal } from '@/contexts/TerminalContext';
 import { 
   TerminalSquare, 
   Plus, 
@@ -13,14 +14,6 @@ import {
 import { cn } from '@/lib/utils';
 
 import '@xterm/xterm/css/xterm.css';
-
-interface TerminalInstance {
-  id: string;
-  name: string;
-  xterm: XTerm | null;
-  fitAddon: FitAddon | null;
-  isReady: boolean;
-}
 
 export function TerminalTab() {
   const {
@@ -34,38 +27,48 @@ export function TerminalTab() {
     closeTerminal,
   } = useE2BSandbox();
 
+  const {
+    terminals,
+    activeTerminalId,
+    isInitializing,
+    addTerminal,
+    updateTerminal,
+    removeTerminal,
+    setActiveTerminalId,
+    setIsInitializing,
+    incrementCounter,
+    setXtermInstance,
+    getXtermInstance,
+    removeXtermInstance,
+    setTerminalRef,
+    getTerminalRef,
+    xtermInstances,
+  } = useTerminal();
+
   const containerRef = useRef<HTMLDivElement>(null);
-  const terminalRefs = useRef<Map<string, HTMLDivElement>>(new Map());
-  const [terminals, setTerminals] = useState<TerminalInstance[]>([]);
-  const [activeTerminalId, setActiveTerminalId] = useState<string | null>(null);
-  const [isInitializing, setIsInitializing] = useState<string | null>(null);
-  const [terminalCounter, setTerminalCounter] = useState(1);
-  
-  const xtermInstancesRef = useRef<Map<string, { xterm: XTerm; fitAddon: FitAddon }>>(new Map());
+  const initializingRef = useRef<Set<string>>(new Set());
 
   const createNewTerminal = useCallback(async () => {
     if (!isConnected) return;
 
     const terminalId = `terminal-${Date.now()}`;
-    const terminalName = `Terminal ${terminalCounter}`;
-    setTerminalCounter(prev => prev + 1);
+    const counter = incrementCounter();
+    const terminalName = `Terminal ${counter}`;
 
-    const newTerminal: TerminalInstance = {
+    addTerminal({
       id: terminalId,
       name: terminalName,
-      xterm: null,
-      fitAddon: null,
       isReady: false,
-    };
-
-    setTerminals(prev => [...prev, newTerminal]);
+    });
     setActiveTerminalId(terminalId);
     setIsInitializing(terminalId);
-  }, [isConnected, terminalCounter]);
+  }, [isConnected, incrementCounter, addTerminal, setActiveTerminalId, setIsInitializing]);
 
   const initializeTerminal = useCallback(async (terminalId: string) => {
-    const terminalDiv = terminalRefs.current.get(terminalId);
-    if (!terminalDiv || xtermInstancesRef.current.has(terminalId)) return;
+    const terminalDiv = getTerminalRef(terminalId);
+    if (!terminalDiv || getXtermInstance(terminalId) || initializingRef.current.has(terminalId)) return;
+
+    initializingRef.current.add(terminalId);
 
     const xterm = new XTerm({
       cursorBlink: true,
@@ -101,7 +104,7 @@ export function TerminalTab() {
     xterm.loadAddon(fitAddon);
     xterm.open(terminalDiv);
 
-    xtermInstancesRef.current.set(terminalId, { xterm, fitAddon });
+    setXtermInstance(terminalId, xterm, fitAddon);
 
     setTimeout(() => {
       fitAddon.fit();
@@ -119,22 +122,19 @@ export function TerminalTab() {
         sendTerminalInput(terminalId, data);
       });
 
-      setTerminals(prev => prev.map(t => 
-        t.id === terminalId ? { ...t, xterm, fitAddon, isReady: true } : t
-      ));
+      updateTerminal(terminalId, { isReady: true });
     }
 
     setIsInitializing(null);
-  }, [createTerminal, sendTerminalInput]);
+    initializingRef.current.delete(terminalId);
+  }, [createTerminal, sendTerminalInput, getTerminalRef, getXtermInstance, setXtermInstance, updateTerminal, setIsInitializing]);
 
-  // Create first terminal when connected
   useEffect(() => {
     if (isConnected && terminals.length === 0) {
       createNewTerminal();
     }
   }, [isConnected, terminals.length, createNewTerminal]);
 
-  // Initialize terminal after DOM is ready
   useEffect(() => {
     if (isInitializing) {
       const timer = setTimeout(() => {
@@ -144,10 +144,9 @@ export function TerminalTab() {
     }
   }, [isInitializing, initializeTerminal]);
 
-  // Handle window resize
   useEffect(() => {
     const handleResize = () => {
-      xtermInstancesRef.current.forEach(({ xterm, fitAddon }, terminalId) => {
+      xtermInstances.forEach(({ xterm, fitAddon }, terminalId) => {
         fitAddon.fit();
         resizeTerminal(terminalId, xterm.cols, xterm.rows);
       });
@@ -155,12 +154,11 @@ export function TerminalTab() {
 
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [resizeTerminal]);
+  }, [resizeTerminal, xtermInstances]);
 
-  // Fit terminal when tab becomes active
   useEffect(() => {
     if (activeTerminalId) {
-      const instance = xtermInstancesRef.current.get(activeTerminalId);
+      const instance = getXtermInstance(activeTerminalId);
       if (instance) {
         setTimeout(() => {
           instance.fitAddon.fit();
@@ -168,38 +166,29 @@ export function TerminalTab() {
         }, 100);
       }
     }
-  }, [activeTerminalId]);
+  }, [activeTerminalId, getXtermInstance]);
 
   const handleCloseTerminal = useCallback(async (terminalId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     
-    const instance = xtermInstancesRef.current.get(terminalId);
-    if (instance) {
-      instance.xterm.dispose();
-      xtermInstancesRef.current.delete(terminalId);
-    }
-    
+    removeXtermInstance(terminalId);
     await closeTerminal(terminalId);
-    terminalRefs.current.delete(terminalId);
+    setTerminalRef(terminalId, null);
     
-    setTerminals(prev => {
-      const newTerminals = prev.filter(t => t.id !== terminalId);
-      if (activeTerminalId === terminalId && newTerminals.length > 0) {
-        setActiveTerminalId(newTerminals[newTerminals.length - 1].id);
-      } else if (newTerminals.length === 0) {
-        setActiveTerminalId(null);
-      }
-      return newTerminals;
-    });
-  }, [activeTerminalId, closeTerminal]);
-
-  const setTerminalRef = useCallback((terminalId: string, el: HTMLDivElement | null) => {
-    if (el) {
-      terminalRefs.current.set(terminalId, el);
+    const newTerminals = terminals.filter(t => t.id !== terminalId);
+    removeTerminal(terminalId);
+    
+    if (activeTerminalId === terminalId && newTerminals.length > 0) {
+      setActiveTerminalId(newTerminals[newTerminals.length - 1].id);
+    } else if (newTerminals.length === 0) {
+      setActiveTerminalId(null);
     }
-  }, []);
+  }, [activeTerminalId, closeTerminal, terminals, removeTerminal, removeXtermInstance, setTerminalRef, setActiveTerminalId]);
 
-  // Not connected state
+  const handleSetTerminalRef = useCallback((terminalId: string, el: HTMLDivElement | null) => {
+    setTerminalRef(terminalId, el);
+  }, [setTerminalRef]);
+
   if (!isConnected) {
     return (
       <div className="h-full flex flex-col items-center justify-center text-gray-500 bg-[#1e1e1e]">
@@ -278,7 +267,7 @@ export function TerminalTab() {
         {terminals.map((terminal) => (
           <div
             key={terminal.id}
-            ref={(el) => setTerminalRef(terminal.id, el)}
+            ref={(el) => handleSetTerminalRef(terminal.id, el)}
             className={cn(
               'absolute inset-0 p-2',
               terminal.id === activeTerminalId ? 'block' : 'hidden'
