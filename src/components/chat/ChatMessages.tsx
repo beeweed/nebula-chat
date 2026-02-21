@@ -3,6 +3,7 @@ import { Bot, User, Copy, Check } from 'lucide-react';
 import { Message } from '@/types/chat';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { FileWriteBlock } from './FileWriteBlock';
+import { CommandBlock } from './CommandBlock';
 import { cn } from '@/lib/utils';
 
 interface ChatMessagesProps {
@@ -225,6 +226,15 @@ function MessageRow({
               <div className="prose-content pr-6 sm:pr-8">
                 <MarkdownRenderer content={message.content} isStreaming={isStreamingThis} />
               </div>
+              
+              {/* Command Execution Blocks */}
+              {message.commandExecutions && message.commandExecutions.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  {message.commandExecutions.map((ce) => (
+                    <CommandBlock key={ce.id} execution={ce} />
+                  ))}
+                </div>
+              )}
               
               {/* File Write Blocks */}
               {message.fileWrites && message.fileWrites.length > 0 && (

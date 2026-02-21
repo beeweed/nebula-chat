@@ -1,10 +1,11 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { Message, FileWriteEvent } from '@/types/chat';
-import { streamChatWithTools, ToolCallEvent, StreamingToolCallEvent } from '@/lib/openrouter';
+import { Message, FileWriteEvent, CommandExecutionEvent } from '@/types/chat';
+import { streamChatWithTools, ToolCallEvent, StreamingToolCallEvent, CommandCallEvent, StreamingCommandCallEvent } from '@/lib/openrouter';
 
 interface UseChatMessagesOptions {
   writeFile?: (path: string, content: string) => Promise<boolean>;
   makeDirectory?: (path: string) => Promise<boolean>;
+  runCommand?: (command: string, background?: boolean) => Promise<any>;
 }
 
 export function useChatMessages(options: UseChatMessagesOptions = {}) {
@@ -17,6 +18,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}) {
   const lastUpdateTimeRef = useRef<number>(0);
   const pendingUpdateRef = useRef<boolean>(false);
   const fileWritesRef = useRef<FileWriteEvent[]>([]);
+  const commandExecutionsRef = useRef<CommandExecutionEvent[]>([]);
   
   const streamingContent = useRef<string>('');
   
@@ -32,19 +34,22 @@ export function useChatMessages(options: UseChatMessagesOptions = {}) {
       if (timeSinceLastUpdate >= 11) {
         const content = streamingContentRef.current;
         const currentFileWrites = [...fileWritesRef.current];
+        const currentCommandExecutions = [...commandExecutionsRef.current];
         
         setMessages((prev) => {
           const lastMsg = prev[prev.length - 1];
           if (lastMsg?.id === assistantId) {
             const needsUpdate = lastMsg.content !== content || 
-              JSON.stringify(lastMsg.fileWrites) !== JSON.stringify(currentFileWrites);
+              JSON.stringify(lastMsg.fileWrites) !== JSON.stringify(currentFileWrites) ||
+              JSON.stringify(lastMsg.commandExecutions) !== JSON.stringify(currentCommandExecutions);
             
             if (needsUpdate) {
               const newMessages = [...prev];
               newMessages[newMessages.length - 1] = { 
                 ...lastMsg, 
                 content,
-                fileWrites: currentFileWrites.length > 0 ? currentFileWrites : undefined
+                fileWrites: currentFileWrites.length > 0 ? currentFileWrites : undefined,
+                commandExecutions: currentCommandExecutions.length > 0 ? currentCommandExecutions : undefined
               };
               return newMessages;
             }
@@ -88,6 +93,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}) {
       streamingContent.current = '';
       lastUpdateTimeRef.current = 0;
       fileWritesRef.current = [];
+      commandExecutionsRef.current = [];
 
       const assistantMsg: Message = {
         id: assistantId,
@@ -95,6 +101,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}) {
         content: '',
         timestamp: new Date(),
         fileWrites: [],
+        commandExecutions: [],
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
@@ -157,6 +164,66 @@ export function useChatMessages(options: UseChatMessagesOptions = {}) {
         scheduleUpdate(assistantId);
       };
 
+      const handleStreamingCommandCall = (event: StreamingCommandCallEvent) => {
+        const existingIndex = commandExecutionsRef.current.findIndex(
+          (ce) => ce.id === event.toolCallId
+        );
+
+        const streamingCommand: CommandExecutionEvent = {
+          id: event.toolCallId,
+          command: event.command,
+          description: event.description,
+          stdout: '',
+          stderr: '',
+          exitCode: null,
+          success: false,
+          isRunning: true,
+          isBackground: false,
+          timedOut: false,
+          message: 'Running command...',
+        };
+
+        if (existingIndex >= 0) {
+          commandExecutionsRef.current = commandExecutionsRef.current.map((ce, i) =>
+            i === existingIndex ? streamingCommand : ce
+          );
+        } else {
+          commandExecutionsRef.current = [...commandExecutionsRef.current, streamingCommand];
+        }
+        
+        scheduleUpdate(assistantId);
+      };
+
+      const handleCommandCall = (event: CommandCallEvent) => {
+        const existingIndex = commandExecutionsRef.current.findIndex(
+          (ce) => ce.id === event.toolCallId
+        );
+
+        const commandEvent: CommandExecutionEvent = {
+          id: event.toolCallId,
+          command: event.result.command,
+          description: event.result.description,
+          stdout: event.result.stdout,
+          stderr: event.result.stderr,
+          exitCode: event.result.exit_code,
+          success: event.result.success,
+          isRunning: false,
+          isBackground: event.result.is_background,
+          timedOut: event.result.timed_out,
+          message: event.result.message,
+        };
+        
+        if (existingIndex >= 0) {
+          commandExecutionsRef.current = commandExecutionsRef.current.map((ce, i) =>
+            i === existingIndex ? commandEvent : ce
+          );
+        } else {
+          commandExecutionsRef.current = [...commandExecutionsRef.current, commandEvent];
+        }
+        
+        scheduleUpdate(assistantId);
+      };
+
       await streamChatWithTools({
         apiKey,
         model,
@@ -168,6 +235,8 @@ export function useChatMessages(options: UseChatMessagesOptions = {}) {
         },
         onStreamingToolCall: handleStreamingToolCall,
         onToolCall: handleToolCall,
+        onStreamingCommandCall: handleStreamingCommandCall,
+        onCommandCall: handleCommandCall,
         onDone: () => {
           if (rafIdRef.current) {
             cancelAnimationFrame(rafIdRef.current);
@@ -175,6 +244,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}) {
           
           const finalContent = streamingContentRef.current;
           const finalFileWrites = [...fileWritesRef.current];
+          const finalCommandExecutions = [...commandExecutionsRef.current];
           
           setMessages((prev) =>
             prev.map((m) =>
@@ -182,7 +252,8 @@ export function useChatMessages(options: UseChatMessagesOptions = {}) {
                 ? { 
                     ...m, 
                     content: finalContent,
-                    fileWrites: finalFileWrites.length > 0 ? finalFileWrites : undefined
+                    fileWrites: finalFileWrites.length > 0 ? finalFileWrites : undefined,
+                    commandExecutions: finalCommandExecutions.length > 0 ? finalCommandExecutions : undefined
                   } 
                 : m
             )
@@ -193,6 +264,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}) {
           streamingContentRef.current = '';
           pendingUpdateRef.current = false;
           fileWritesRef.current = [];
+          commandExecutionsRef.current = [];
         },
         onError: (error) => {
           if (rafIdRef.current) {
@@ -204,6 +276,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}) {
           streamingContentRef.current = '';
           pendingUpdateRef.current = false;
           fileWritesRef.current = [];
+          commandExecutionsRef.current = [];
           
           setMessages((prev) =>
             prev.map((m) =>
@@ -215,9 +288,10 @@ export function useChatMessages(options: UseChatMessagesOptions = {}) {
         },
         writeFile: options.writeFile || (async () => false),
         makeDirectory: options.makeDirectory || (async () => false),
+        runCommand: options.runCommand || (async () => null),
       });
     },
-    [messages, isStreaming, scheduleUpdate, options.writeFile, options.makeDirectory]
+    [messages, isStreaming, scheduleUpdate, options.writeFile, options.makeDirectory, options.runCommand]
   );
 
   const clearMessages = useCallback(() => {
@@ -225,6 +299,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}) {
     streamingContentRef.current = '';
     streamingContent.current = '';
     fileWritesRef.current = [];
+    commandExecutionsRef.current = [];
   }, []);
 
   return { 

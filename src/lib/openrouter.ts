@@ -2,6 +2,7 @@ import { OpenRouterModel } from '@/types/chat';
 import { SYSTEM_PROMPT } from '@/config/prompts';
 import { getAllTools, MAX_TOOL_ITERATIONS, ToolCall, FileWriteResult } from '@/tools';
 import { FILE_WRITE_TOOL_NAME, parseFileWriteToolInput, executeFileWriteTool } from '@/tools/fileWriteTool';
+import { BASH_TOOL_NAME, parseBashToolInput, executeBashTool, BashToolResult } from '@/tools/bashTool';
 
 const OPENROUTER_BASE = 'https://openrouter.ai/api/v1';
 
@@ -13,12 +14,28 @@ export interface ToolCallEvent {
   result: FileWriteResult;
 }
 
+export interface CommandCallEvent {
+  toolCallId: string;
+  toolName: string;
+  command: string;
+  description: string;
+  result: BashToolResult;
+}
+
 export interface StreamingToolCallEvent {
   toolCallId: string;
   toolName: string;
   filePath: string;
   streamedContent: string;
   isComplete: boolean;
+}
+
+export interface StreamingCommandCallEvent {
+  toolCallId: string;
+  toolName: string;
+  command: string;
+  description: string;
+  isRunning: boolean;
 }
 
 function extractPartialFileWrite(partialArgs: string): { filePath: string; content: string } | null {
@@ -73,10 +90,13 @@ interface StreamChatOptions {
   onChunk: (text: string) => void;
   onToolCall?: (event: ToolCallEvent) => void;
   onStreamingToolCall?: (event: StreamingToolCallEvent) => void;
+  onCommandCall?: (event: CommandCallEvent) => void;
+  onStreamingCommandCall?: (event: StreamingCommandCallEvent) => void;
   onDone: () => void;
   onError: (error: Error) => void;
   writeFile: (path: string, content: string) => Promise<boolean>;
   makeDirectory: (path: string) => Promise<boolean>;
+  runCommand: (command: string, background?: boolean) => Promise<any>;
 }
 
 async function makeStreamRequest(
@@ -239,6 +259,7 @@ export async function streamChat(
     onError,
     writeFile: async () => false,
     makeDirectory: async () => false,
+    runCommand: async () => null,
   });
 }
 
@@ -250,10 +271,13 @@ export async function streamChatWithTools(options: StreamChatOptions): Promise<v
     onChunk,
     onToolCall,
     onStreamingToolCall,
+    onCommandCall,
+    onStreamingCommandCall,
     onDone,
     onError,
     writeFile,
     makeDirectory,
+    runCommand,
   } = options;
 
   try {
@@ -321,6 +345,58 @@ export async function streamChatWithTools(options: StreamChatOptions): Promise<v
               content: JSON.stringify({
                 success: false,
                 message: 'Failed to parse tool input',
+              }),
+            });
+          }
+        } else if (toolName === BASH_TOOL_NAME) {
+          const input = parseBashToolInput(toolCall.function.arguments);
+          
+          if (input) {
+            // Notify UI that command is starting
+            if (onStreamingCommandCall) {
+              onStreamingCommandCall({
+                toolCallId: toolCall.id,
+                toolName,
+                command: input.command,
+                description: input.description,
+                isRunning: true,
+              });
+            }
+            
+            const bashResult = await executeBashTool(input, runCommand);
+            
+            if (onCommandCall) {
+              onCommandCall({
+                toolCallId: toolCall.id,
+                toolName,
+                command: input.command,
+                description: input.description,
+                result: bashResult,
+              });
+            }
+            
+            conversationMessages.push({
+              role: 'tool',
+              tool_call_id: toolCall.id,
+              content: JSON.stringify({
+                success: bashResult.success,
+                command: bashResult.command,
+                description: bashResult.description,
+                stdout: bashResult.stdout,
+                stderr: bashResult.stderr,
+                exit_code: bashResult.exit_code,
+                timed_out: bashResult.timed_out,
+                is_background: bashResult.is_background,
+                message: bashResult.message,
+              }),
+            });
+          } else {
+            conversationMessages.push({
+              role: 'tool',
+              tool_call_id: toolCall.id,
+              content: JSON.stringify({
+                success: false,
+                message: 'Failed to parse bash tool input',
               }),
             });
           }
