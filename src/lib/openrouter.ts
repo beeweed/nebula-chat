@@ -13,6 +13,44 @@ export interface ToolCallEvent {
   result: FileWriteResult;
 }
 
+export interface StreamingToolCallEvent {
+  toolCallId: string;
+  toolName: string;
+  filePath: string;
+  streamedContent: string;
+  isComplete: boolean;
+}
+
+function extractPartialFileWrite(partialArgs: string): { filePath: string; content: string } | null {
+  try {
+    const filePathMatch = partialArgs.match(/"file_path"\s*:\s*"([^"]+)"/);
+    const filePath = filePathMatch ? filePathMatch[1] : '';
+    
+    if (!filePath) return null;
+
+    const contentMatch = partialArgs.match(/"content"\s*:\s*"([\s\S]*?)(?:"|$)/);
+    let content = '';
+    
+    if (contentMatch) {
+      content = contentMatch[1];
+      try {
+        content = JSON.parse(`"${content}"`);
+      } catch {
+        content = content
+          .replace(/\\n/g, '\n')
+          .replace(/\\t/g, '\t')
+          .replace(/\\r/g, '\r')
+          .replace(/\\\\/g, '\\')
+          .replace(/\\"/g, '"');
+      }
+    }
+    
+    return { filePath, content };
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchModels(apiKey: string): Promise<OpenRouterModel[]> {
   const response = await fetch(`${OPENROUTER_BASE}/models`, {
     headers: {
@@ -34,6 +72,7 @@ interface StreamChatOptions {
   messages: Array<{ role: string; content: string | null; tool_calls?: ToolCall[]; tool_call_id?: string }>;
   onChunk: (text: string) => void;
   onToolCall?: (event: ToolCallEvent) => void;
+  onStreamingToolCall?: (event: StreamingToolCallEvent) => void;
   onDone: () => void;
   onError: (error: Error) => void;
   writeFile: (path: string, content: string) => Promise<boolean>;
@@ -81,10 +120,14 @@ interface StreamResult {
   finishReason: string | null;
 }
 
-async function processStream(
-  response: Response,
-  onChunk: (text: string) => void
-): Promise<StreamResult> {
+interface ProcessStreamOptions {
+  response: Response;
+  onChunk: (text: string) => void;
+  onStreamingToolCall?: (event: StreamingToolCallEvent) => void;
+}
+
+async function processStream(options: ProcessStreamOptions): Promise<StreamResult> {
+  const { response, onChunk, onStreamingToolCall } = options;
   const reader = response.body?.getReader();
   if (!reader) throw new Error('No response body');
 
@@ -94,6 +137,9 @@ async function processStream(
   const toolCalls: ToolCall[] = [];
   let finishReason: string | null = null;
   const toolCallsMap: Map<number, { id: string; type: string; function: { name: string; arguments: string } }> = new Map();
+  
+  let lastStreamingUpdate = 0;
+  const STREAMING_THROTTLE_MS = 50;
 
   while (true) {
     const { done, value } = await reader.read();
@@ -141,6 +187,26 @@ async function processStream(
               if (tc.function?.name) existing.function.name += tc.function.name;
               if (tc.function?.arguments) existing.function.arguments += tc.function.arguments;
             }
+            
+            if (onStreamingToolCall) {
+              const now = performance.now();
+              if (now - lastStreamingUpdate >= STREAMING_THROTTLE_MS) {
+                lastStreamingUpdate = now;
+                const toolCallData = toolCallsMap.get(index);
+                if (toolCallData && toolCallData.function.name === FILE_WRITE_TOOL_NAME) {
+                  const partial = extractPartialFileWrite(toolCallData.function.arguments);
+                  if (partial && partial.filePath) {
+                    onStreamingToolCall({
+                      toolCallId: toolCallData.id,
+                      toolName: toolCallData.function.name,
+                      filePath: partial.filePath,
+                      streamedContent: partial.content,
+                      isComplete: false,
+                    });
+                  }
+                }
+              }
+            }
           }
         }
       } catch {
@@ -183,6 +249,7 @@ export async function streamChatWithTools(options: StreamChatOptions): Promise<v
     messages,
     onChunk,
     onToolCall,
+    onStreamingToolCall,
     onDone,
     onError,
     writeFile,
@@ -197,7 +264,11 @@ export async function streamChatWithTools(options: StreamChatOptions): Promise<v
       iteration++;
       
       const response = await makeStreamRequest(apiKey, model, conversationMessages);
-      const result = await processStream(response, onChunk);
+      const result = await processStream({
+        response,
+        onChunk,
+        onStreamingToolCall,
+      });
       
       if (result.toolCalls.length === 0) {
         onDone();

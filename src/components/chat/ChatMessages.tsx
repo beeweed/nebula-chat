@@ -236,6 +236,8 @@ function MessageRow({
                       content={fw.content}
                       success={fw.success}
                       message={fw.message}
+                      isStreaming={fw.isStreaming}
+                      streamedContent={fw.streamedContent}
                     />
                   ))}
                 </div>

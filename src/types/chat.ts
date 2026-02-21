@@ -4,6 +4,8 @@ export interface FileWriteEvent {
   content: string;
   success: boolean;
   message: string;
+  isStreaming?: boolean;
+  streamedContent?: string;
 }
 
 export interface Message {

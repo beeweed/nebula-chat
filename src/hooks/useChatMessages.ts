@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { Message, FileWriteEvent } from '@/types/chat';
-import { streamChatWithTools, ToolCallEvent } from '@/lib/openrouter';
+import { streamChatWithTools, ToolCallEvent, StreamingToolCallEvent } from '@/lib/openrouter';
 
 interface UseChatMessagesOptions {
   writeFile?: (path: string, content: string) => Promise<boolean>;
@@ -105,16 +105,55 @@ export function useChatMessages(options: UseChatMessagesOptions = {}) {
         content: m.content,
       }));
 
+      const handleStreamingToolCall = (event: StreamingToolCallEvent) => {
+        const existingIndex = fileWritesRef.current.findIndex(
+          (fw) => fw.id === event.toolCallId
+        );
+
+        const streamingFileWrite: FileWriteEvent = {
+          id: event.toolCallId,
+          filePath: event.filePath,
+          content: '',
+          success: false,
+          message: 'Writing file...',
+          isStreaming: true,
+          streamedContent: event.streamedContent,
+        };
+
+        if (existingIndex >= 0) {
+          fileWritesRef.current = fileWritesRef.current.map((fw, i) =>
+            i === existingIndex ? streamingFileWrite : fw
+          );
+        } else {
+          fileWritesRef.current = [...fileWritesRef.current, streamingFileWrite];
+        }
+        
+        scheduleUpdate(assistantId);
+      };
+
       const handleToolCall = (event: ToolCallEvent) => {
+        const existingIndex = fileWritesRef.current.findIndex(
+          (fw) => fw.id === event.toolCallId
+        );
+
         const fileWriteEvent: FileWriteEvent = {
           id: event.toolCallId,
           filePath: event.filePath,
           content: event.content,
           success: event.result.success,
           message: event.result.message,
+          isStreaming: false,
+          streamedContent: undefined,
         };
         
-        fileWritesRef.current = [...fileWritesRef.current, fileWriteEvent];
+        if (existingIndex >= 0) {
+          fileWritesRef.current = fileWritesRef.current.map((fw, i) =>
+            i === existingIndex ? fileWriteEvent : fw
+          );
+        } else {
+          fileWritesRef.current = [...fileWritesRef.current, fileWriteEvent];
+        }
+        
         scheduleUpdate(assistantId);
       };
 
@@ -127,6 +166,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}) {
           streamingContent.current = streamingContentRef.current;
           scheduleUpdate(assistantId);
         },
+        onStreamingToolCall: handleStreamingToolCall,
         onToolCall: handleToolCall,
         onDone: () => {
           if (rafIdRef.current) {
