@@ -141,6 +141,35 @@ const useFileSystem = () => {
     return '/home/user/' + pathParts.join('/');
   }, [files]);
 
+  // Find file ID by path in a given file list
+  const findFileIdByPath = useCallback((path: string, fileList: FileSystemItem[]): string | null => {
+    for (const file of fileList) {
+      if (file.type === 'file') {
+        const filePath = (() => {
+          const pathParts: string[] = [file.name];
+          let currentParentId = file.parentId;
+          
+          while (currentParentId && currentParentId !== 'root') {
+            const parent = fileList.find(f => f.id === currentParentId);
+            if (parent) {
+              pathParts.unshift(parent.name);
+              currentParentId = parent.parentId;
+            } else {
+              break;
+            }
+          }
+          
+          return '/home/user/' + pathParts.join('/');
+        })();
+        
+        if (filePath === path) {
+          return file.id;
+        }
+      }
+    }
+    return null;
+  }, []);
+
   const openFileById = useCallback((id: string) => {
     setOpenFiles(prev => {
       if (!prev.includes(id)) {
@@ -236,10 +265,46 @@ const useFileSystem = () => {
 
   const replaceWithSandboxFiles = useCallback((newFiles: FileSystemItem[]) => {
     const root = INITIAL_FILES.find(f => f.id === 'root');
-    setFiles([root!, ...newFiles]);
-    setOpenFiles([]);
-    setActiveFileId(null);
-  }, []);
+    const newFileList = [root!, ...newFiles];
+    
+    // Build path mappings for currently open files before replacing
+    const openFilePaths: string[] = [];
+    let activeFilePath: string | null = null;
+    
+    // Get paths of currently open files
+    for (const openFileId of openFiles) {
+      const path = getFilePath(openFileId, files);
+      if (path) {
+        openFilePaths.push(path);
+      }
+    }
+    
+    // Get path of active file
+    if (activeFileId) {
+      activeFilePath = getFilePath(activeFileId, files);
+    }
+    
+    // Update files
+    setFiles(newFileList);
+    
+    // Restore open files by finding matching paths in new file list
+    const newOpenFiles: string[] = [];
+    for (const path of openFilePaths) {
+      const newFileId = findFileIdByPath(path, newFiles);
+      if (newFileId) {
+        newOpenFiles.push(newFileId);
+      }
+    }
+    setOpenFiles(newOpenFiles);
+    
+    // Restore active file
+    if (activeFilePath) {
+      const newActiveFileId = findFileIdByPath(activeFilePath, newFiles);
+      setActiveFileId(newActiveFileId);
+    } else {
+      setActiveFileId(null);
+    }
+  }, [files, openFiles, activeFileId, getFilePath, findFileIdByPath]);
 
   const getAllFiles = useCallback(() => {
     return files;
