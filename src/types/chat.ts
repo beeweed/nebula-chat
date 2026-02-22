@@ -8,12 +8,22 @@ export interface FileWriteEvent {
   streamedContent?: string;
 }
 
+export interface FileReadEvent {
+  id: string;
+  filePath: string;
+  content: string;
+  success: boolean;
+  message: string;
+  lineCount?: number;
+}
+
 export interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
   fileWrites?: FileWriteEvent[];
+  fileReads?: FileReadEvent[];
 }
 
 export interface OpenRouterModel {

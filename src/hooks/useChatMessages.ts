@@ -1,10 +1,11 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { Message, FileWriteEvent } from '@/types/chat';
-import { streamChatWithTools, ToolCallEvent, StreamingToolCallEvent } from '@/lib/openrouter';
+import { Message, FileWriteEvent, FileReadEvent } from '@/types/chat';
+import { streamChatWithTools, ToolCallEvent, StreamingToolCallEvent, FileReadToolCallEvent } from '@/lib/openrouter';
 
 interface UseChatMessagesOptions {
   writeFile?: (path: string, content: string) => Promise<boolean>;
   makeDirectory?: (path: string) => Promise<boolean>;
+  readFile?: (path: string) => Promise<string | null>;
 }
 
 export function useChatMessages(options: UseChatMessagesOptions = {}) {
@@ -17,6 +18,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}) {
   const lastUpdateTimeRef = useRef<number>(0);
   const pendingUpdateRef = useRef<boolean>(false);
   const fileWritesRef = useRef<FileWriteEvent[]>([]);
+  const fileReadsRef = useRef<FileReadEvent[]>([]);
   
   const streamingContent = useRef<string>('');
   
@@ -32,19 +34,22 @@ export function useChatMessages(options: UseChatMessagesOptions = {}) {
       if (timeSinceLastUpdate >= 11) {
         const content = streamingContentRef.current;
         const currentFileWrites = [...fileWritesRef.current];
+        const currentFileReads = [...fileReadsRef.current];
         
         setMessages((prev) => {
           const lastMsg = prev[prev.length - 1];
           if (lastMsg?.id === assistantId) {
             const needsUpdate = lastMsg.content !== content || 
-              JSON.stringify(lastMsg.fileWrites) !== JSON.stringify(currentFileWrites);
+              JSON.stringify(lastMsg.fileWrites) !== JSON.stringify(currentFileWrites) ||
+              JSON.stringify(lastMsg.fileReads) !== JSON.stringify(currentFileReads);
             
             if (needsUpdate) {
               const newMessages = [...prev];
               newMessages[newMessages.length - 1] = { 
                 ...lastMsg, 
                 content,
-                fileWrites: currentFileWrites.length > 0 ? currentFileWrites : undefined
+                fileWrites: currentFileWrites.length > 0 ? currentFileWrites : undefined,
+                fileReads: currentFileReads.length > 0 ? currentFileReads : undefined
               };
               return newMessages;
             }
@@ -88,6 +93,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}) {
       streamingContent.current = '';
       lastUpdateTimeRef.current = 0;
       fileWritesRef.current = [];
+      fileReadsRef.current = [];
 
       const assistantMsg: Message = {
         id: assistantId,
@@ -95,6 +101,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}) {
         content: '',
         timestamp: new Date(),
         fileWrites: [],
+        fileReads: [],
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
@@ -157,6 +164,20 @@ export function useChatMessages(options: UseChatMessagesOptions = {}) {
         scheduleUpdate(assistantId);
       };
 
+      const handleFileReadToolCall = (event: FileReadToolCallEvent) => {
+        const fileReadEvent: FileReadEvent = {
+          id: event.toolCallId,
+          filePath: event.filePath,
+          content: event.content,
+          success: event.result.success,
+          message: event.result.message,
+          lineCount: event.result.line_count,
+        };
+        
+        fileReadsRef.current = [...fileReadsRef.current, fileReadEvent];
+        scheduleUpdate(assistantId);
+      };
+
       await streamChatWithTools({
         apiKey,
         model,
@@ -168,6 +189,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}) {
         },
         onStreamingToolCall: handleStreamingToolCall,
         onToolCall: handleToolCall,
+        onFileReadToolCall: handleFileReadToolCall,
         onDone: () => {
           if (rafIdRef.current) {
             cancelAnimationFrame(rafIdRef.current);
@@ -175,6 +197,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}) {
           
           const finalContent = streamingContentRef.current;
           const finalFileWrites = [...fileWritesRef.current];
+          const finalFileReads = [...fileReadsRef.current];
           
           setMessages((prev) =>
             prev.map((m) =>
@@ -182,7 +205,8 @@ export function useChatMessages(options: UseChatMessagesOptions = {}) {
                 ? { 
                     ...m, 
                     content: finalContent,
-                    fileWrites: finalFileWrites.length > 0 ? finalFileWrites : undefined
+                    fileWrites: finalFileWrites.length > 0 ? finalFileWrites : undefined,
+                    fileReads: finalFileReads.length > 0 ? finalFileReads : undefined
                   } 
                 : m
             )
@@ -193,6 +217,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}) {
           streamingContentRef.current = '';
           pendingUpdateRef.current = false;
           fileWritesRef.current = [];
+          fileReadsRef.current = [];
         },
         onError: (error) => {
           if (rafIdRef.current) {
@@ -204,6 +229,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}) {
           streamingContentRef.current = '';
           pendingUpdateRef.current = false;
           fileWritesRef.current = [];
+          fileReadsRef.current = [];
           
           setMessages((prev) =>
             prev.map((m) =>
@@ -215,9 +241,10 @@ export function useChatMessages(options: UseChatMessagesOptions = {}) {
         },
         writeFile: options.writeFile || (async () => false),
         makeDirectory: options.makeDirectory || (async () => false),
+        readFile: options.readFile || (async () => null),
       });
     },
-    [messages, isStreaming, scheduleUpdate, options.writeFile, options.makeDirectory]
+    [messages, isStreaming, scheduleUpdate, options.writeFile, options.makeDirectory, options.readFile]
   );
 
   const clearMessages = useCallback(() => {
@@ -225,6 +252,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}) {
     streamingContentRef.current = '';
     streamingContent.current = '';
     fileWritesRef.current = [];
+    fileReadsRef.current = [];
   }, []);
 
   return { 

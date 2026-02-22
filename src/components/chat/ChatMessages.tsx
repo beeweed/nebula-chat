@@ -3,6 +3,7 @@ import { Bot, User, Copy, Check } from 'lucide-react';
 import { Message } from '@/types/chat';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { FileWriteBlock } from './FileWriteBlock';
+import { FileReadBlock } from './FileReadBlock';
 import { cn } from '@/lib/utils';
 
 interface ChatMessagesProps {
@@ -238,6 +239,22 @@ function MessageRow({
                       message={fw.message}
                       isStreaming={fw.isStreaming}
                       streamedContent={fw.streamedContent}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* File Read Blocks */}
+              {message.fileReads && message.fileReads.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  {message.fileReads.map((fr) => (
+                    <FileReadBlock
+                      key={fr.id}
+                      filePath={fr.filePath}
+                      content={fr.content}
+                      success={fr.success}
+                      message={fr.message}
+                      lineCount={fr.lineCount}
                     />
                   ))}
                 </div>

@@ -31,12 +31,14 @@ const Index = () => {
     hasApiKey: hasE2bApiKey,
     writeFile,
     makeDirectory,
+    readFile,
   } = useE2BSandbox();
 
   const chatOptions = useMemo(() => ({
     writeFile,
     makeDirectory,
-  }), [writeFile, makeDirectory]);
+    readFile,
+  }), [writeFile, makeDirectory, readFile]);
 
   const { messages, isStreaming, sendMessage } = useChatMessages(chatOptions);
 

@@ -2,6 +2,7 @@ import { OpenRouterModel } from '@/types/chat';
 import { SYSTEM_PROMPT } from '@/config/prompts';
 import { getAllTools, MAX_TOOL_ITERATIONS, ToolCall, FileWriteResult } from '@/tools';
 import { FILE_WRITE_TOOL_NAME, parseFileWriteToolInput, executeFileWriteTool } from '@/tools/fileWriteTool';
+import { FILE_READ_TOOL_NAME, parseFileReadToolInput, executeFileReadTool, FileReadResult } from '@/tools/fileReadTool';
 
 const OPENROUTER_BASE = 'https://openrouter.ai/api/v1';
 
@@ -11,6 +12,14 @@ export interface ToolCallEvent {
   filePath: string;
   content: string;
   result: FileWriteResult;
+}
+
+export interface FileReadToolCallEvent {
+  toolCallId: string;
+  toolName: string;
+  filePath: string;
+  content: string;
+  result: FileReadResult;
 }
 
 export interface StreamingToolCallEvent {
@@ -72,11 +81,13 @@ interface StreamChatOptions {
   messages: Array<{ role: string; content: string | null; tool_calls?: ToolCall[]; tool_call_id?: string }>;
   onChunk: (text: string) => void;
   onToolCall?: (event: ToolCallEvent) => void;
+  onFileReadToolCall?: (event: FileReadToolCallEvent) => void;
   onStreamingToolCall?: (event: StreamingToolCallEvent) => void;
   onDone: () => void;
   onError: (error: Error) => void;
   writeFile: (path: string, content: string) => Promise<boolean>;
   makeDirectory: (path: string) => Promise<boolean>;
+  readFile: (path: string) => Promise<string | null>;
 }
 
 async function makeStreamRequest(
@@ -239,6 +250,7 @@ export async function streamChat(
     onError,
     writeFile: async () => false,
     makeDirectory: async () => false,
+    readFile: async () => null,
   });
 }
 
@@ -249,11 +261,13 @@ export async function streamChatWithTools(options: StreamChatOptions): Promise<v
     messages,
     onChunk,
     onToolCall,
+    onFileReadToolCall,
     onStreamingToolCall,
     onDone,
     onError,
     writeFile,
     makeDirectory,
+    readFile,
   } = options;
 
   try {
@@ -312,6 +326,43 @@ export async function streamChatWithTools(options: StreamChatOptions): Promise<v
                 success: toolResult.success,
                 message: toolResult.message,
                 file_path: toolResult.file_path,
+              }),
+            });
+          } else {
+            conversationMessages.push({
+              role: 'tool',
+              tool_call_id: toolCall.id,
+              content: JSON.stringify({
+                success: false,
+                message: 'Failed to parse tool input',
+              }),
+            });
+          }
+        } else if (toolName === FILE_READ_TOOL_NAME) {
+          const input = parseFileReadToolInput(toolCall.function.arguments);
+          
+          if (input) {
+            const toolResult = await executeFileReadTool(input, readFile);
+            
+            if (onFileReadToolCall) {
+              onFileReadToolCall({
+                toolCallId: toolCall.id,
+                toolName,
+                filePath: input.file_path,
+                content: toolResult.content || '',
+                result: toolResult,
+              });
+            }
+            
+            conversationMessages.push({
+              role: 'tool',
+              tool_call_id: toolCall.id,
+              content: JSON.stringify({
+                success: toolResult.success,
+                message: toolResult.message,
+                file_path: toolResult.file_path,
+                content: toolResult.content,
+                line_count: toolResult.line_count,
               }),
             });
           } else {
