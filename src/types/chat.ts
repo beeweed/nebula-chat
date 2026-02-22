@@ -17,6 +17,15 @@ export interface FileReadEvent {
   lineCount?: number;
 }
 
+export interface FileListEvent {
+  id: string;
+  basePath: string;
+  files: string[];
+  totalCount: number;
+  success: boolean;
+  message: string;
+}
+
 export interface Message {
   id: string;
   role: 'user' | 'assistant';
@@ -24,6 +33,7 @@ export interface Message {
   timestamp: Date;
   fileWrites?: FileWriteEvent[];
   fileReads?: FileReadEvent[];
+  fileLists?: FileListEvent[];
 }
 
 export interface OpenRouterModel {

@@ -4,6 +4,7 @@ import { Message } from '@/types/chat';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { FileWriteBlock } from './FileWriteBlock';
 import { FileReadBlock } from './FileReadBlock';
+import { FileListBlock } from './FileListBlock';
 import { cn } from '@/lib/utils';
 
 interface ChatMessagesProps {
@@ -255,6 +256,18 @@ function MessageRow({
                       success={fr.success}
                       message={fr.message}
                       lineCount={fr.lineCount}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* File List Blocks */}
+              {message.fileLists && message.fileLists.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  {message.fileLists.map((fl) => (
+                    <FileListBlock
+                      key={fl.id}
+                      fileList={fl}
                     />
                   ))}
                 </div>

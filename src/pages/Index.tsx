@@ -32,13 +32,15 @@ const Index = () => {
     writeFile,
     makeDirectory,
     readFile,
+    listFiles,
   } = useE2BSandbox();
 
   const chatOptions = useMemo(() => ({
     writeFile,
     makeDirectory,
     readFile,
-  }), [writeFile, makeDirectory, readFile]);
+    listFiles,
+  }), [writeFile, makeDirectory, readFile, listFiles]);
 
   const { messages, isStreaming, sendMessage } = useChatMessages(chatOptions);
 

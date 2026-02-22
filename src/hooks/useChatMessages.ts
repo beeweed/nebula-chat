@@ -1,11 +1,12 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { Message, FileWriteEvent, FileReadEvent } from '@/types/chat';
-import { streamChatWithTools, ToolCallEvent, StreamingToolCallEvent, FileReadToolCallEvent } from '@/lib/openrouter';
+import { Message, FileWriteEvent, FileReadEvent, FileListEvent } from '@/types/chat';
+import { streamChatWithTools, ToolCallEvent, StreamingToolCallEvent, FileReadToolCallEvent, FileListToolCallEvent } from '@/lib/openrouter';
 
 interface UseChatMessagesOptions {
   writeFile?: (path: string, content: string) => Promise<boolean>;
   makeDirectory?: (path: string) => Promise<boolean>;
   readFile?: (path: string) => Promise<string | null>;
+  listFiles?: (path: string) => Promise<any[]>;
 }
 
 export function useChatMessages(options: UseChatMessagesOptions = {}) {
@@ -19,6 +20,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}) {
   const pendingUpdateRef = useRef<boolean>(false);
   const fileWritesRef = useRef<FileWriteEvent[]>([]);
   const fileReadsRef = useRef<FileReadEvent[]>([]);
+  const fileListsRef = useRef<FileListEvent[]>([]);
   
   const streamingContent = useRef<string>('');
   
@@ -35,13 +37,15 @@ export function useChatMessages(options: UseChatMessagesOptions = {}) {
         const content = streamingContentRef.current;
         const currentFileWrites = [...fileWritesRef.current];
         const currentFileReads = [...fileReadsRef.current];
+        const currentFileLists = [...fileListsRef.current];
         
         setMessages((prev) => {
           const lastMsg = prev[prev.length - 1];
           if (lastMsg?.id === assistantId) {
             const needsUpdate = lastMsg.content !== content || 
               JSON.stringify(lastMsg.fileWrites) !== JSON.stringify(currentFileWrites) ||
-              JSON.stringify(lastMsg.fileReads) !== JSON.stringify(currentFileReads);
+              JSON.stringify(lastMsg.fileReads) !== JSON.stringify(currentFileReads) ||
+              JSON.stringify(lastMsg.fileLists) !== JSON.stringify(currentFileLists);
             
             if (needsUpdate) {
               const newMessages = [...prev];
@@ -49,7 +53,8 @@ export function useChatMessages(options: UseChatMessagesOptions = {}) {
                 ...lastMsg, 
                 content,
                 fileWrites: currentFileWrites.length > 0 ? currentFileWrites : undefined,
-                fileReads: currentFileReads.length > 0 ? currentFileReads : undefined
+                fileReads: currentFileReads.length > 0 ? currentFileReads : undefined,
+                fileLists: currentFileLists.length > 0 ? currentFileLists : undefined
               };
               return newMessages;
             }
@@ -94,6 +99,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}) {
       lastUpdateTimeRef.current = 0;
       fileWritesRef.current = [];
       fileReadsRef.current = [];
+      fileListsRef.current = [];
 
       const assistantMsg: Message = {
         id: assistantId,
@@ -102,6 +108,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}) {
         timestamp: new Date(),
         fileWrites: [],
         fileReads: [],
+        fileLists: [],
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
@@ -178,6 +185,20 @@ export function useChatMessages(options: UseChatMessagesOptions = {}) {
         scheduleUpdate(assistantId);
       };
 
+      const handleFileListToolCall = (event: FileListToolCallEvent) => {
+        const fileListEvent: FileListEvent = {
+          id: event.toolCallId,
+          basePath: event.basePath,
+          files: event.files,
+          totalCount: event.result.total_count,
+          success: event.result.success,
+          message: event.result.message,
+        };
+        
+        fileListsRef.current = [...fileListsRef.current, fileListEvent];
+        scheduleUpdate(assistantId);
+      };
+
       await streamChatWithTools({
         apiKey,
         model,
@@ -190,6 +211,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}) {
         onStreamingToolCall: handleStreamingToolCall,
         onToolCall: handleToolCall,
         onFileReadToolCall: handleFileReadToolCall,
+        onFileListToolCall: handleFileListToolCall,
         onDone: () => {
           if (rafIdRef.current) {
             cancelAnimationFrame(rafIdRef.current);
@@ -198,6 +220,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}) {
           const finalContent = streamingContentRef.current;
           const finalFileWrites = [...fileWritesRef.current];
           const finalFileReads = [...fileReadsRef.current];
+          const finalFileLists = [...fileListsRef.current];
           
           setMessages((prev) =>
             prev.map((m) =>
@@ -206,7 +229,8 @@ export function useChatMessages(options: UseChatMessagesOptions = {}) {
                     ...m, 
                     content: finalContent,
                     fileWrites: finalFileWrites.length > 0 ? finalFileWrites : undefined,
-                    fileReads: finalFileReads.length > 0 ? finalFileReads : undefined
+                    fileReads: finalFileReads.length > 0 ? finalFileReads : undefined,
+                    fileLists: finalFileLists.length > 0 ? finalFileLists : undefined
                   } 
                 : m
             )
@@ -218,6 +242,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}) {
           pendingUpdateRef.current = false;
           fileWritesRef.current = [];
           fileReadsRef.current = [];
+          fileListsRef.current = [];
         },
         onError: (error) => {
           if (rafIdRef.current) {
@@ -230,6 +255,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}) {
           pendingUpdateRef.current = false;
           fileWritesRef.current = [];
           fileReadsRef.current = [];
+          fileListsRef.current = [];
           
           setMessages((prev) =>
             prev.map((m) =>
@@ -242,9 +268,10 @@ export function useChatMessages(options: UseChatMessagesOptions = {}) {
         writeFile: options.writeFile || (async () => false),
         makeDirectory: options.makeDirectory || (async () => false),
         readFile: options.readFile || (async () => null),
+        listFiles: options.listFiles || (async () => []),
       });
     },
-    [messages, isStreaming, scheduleUpdate, options.writeFile, options.makeDirectory, options.readFile]
+    [messages, isStreaming, scheduleUpdate, options.writeFile, options.makeDirectory, options.readFile, options.listFiles]
   );
 
   const clearMessages = useCallback(() => {
@@ -253,6 +280,7 @@ export function useChatMessages(options: UseChatMessagesOptions = {}) {
     streamingContent.current = '';
     fileWritesRef.current = [];
     fileReadsRef.current = [];
+    fileListsRef.current = [];
   }, []);
 
   return { 
