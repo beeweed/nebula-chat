@@ -31,4 +31,4 @@ fi
 
 # Start server
 echo "🔥 Running code-server on http://localhost:$PORT"
-code-server
+code-server ~
